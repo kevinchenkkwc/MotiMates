@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "MotiMates",
+    "slug": "motimates",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.motimates.app"
+    },
+    "android": {
+      "package": "com.motimates.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "scheme": "motimates",
+    "extra": {
+      "router": {}
+    }
+  }
+}
