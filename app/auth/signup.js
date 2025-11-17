@@ -10,9 +10,9 @@ export default function Signup() {
   const [password, setPassword] = useState('');
 
   const handleSignup = () => {
-    // Simulated signup - navigate to tabs
+    // Simulated signup - navigate to home tab
     if (username && email && password) {
-      router.replace('/tabs/home');
+      router.replace('/tabs/3-home');
     }
   };
 

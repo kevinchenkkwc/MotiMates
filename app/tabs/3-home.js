@@ -1,5 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ImageBackground } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export default function Home() {
@@ -24,12 +23,11 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#8B4513', '#D2691E', '#FFB84D']}
-        style={styles.gradient}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
+      <ImageBackground
+        source={require('../../assets/background.png')}
+        style={styles.background}
+        resizeMode="cover"
+      >
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
@@ -46,21 +44,31 @@ export default function Home() {
         </View>
 
         <View style={styles.cardsContainer}>
-          <TouchableOpacity style={styles.actionCard}>
-            <Text style={styles.cardTitle}>Quick Start</Text>
-            <Text style={styles.cardSubtitle}>Join an active session</Text>
-            <View style={styles.cardArrow}>
-              <Text style={styles.arrowText}>›</Text>
-            </View>
-          </TouchableOpacity>
+          <View style={styles.cardWrapper}>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => router.push('/tabs/2-join')}
+            >
+              <Text style={styles.cardTitle}>Quick Start</Text>
+              <Text style={styles.cardSubtitle}>Join an active session</Text>
+              <View style={styles.cardArrow}>
+                <Text style={styles.arrowText}>›</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity style={styles.actionCard}>
-            <Text style={styles.cardTitle}>Host Session</Text>
-            <Text style={styles.cardSubtitle}>Start a co-focus session</Text>
-            <View style={styles.cardArrow}>
-              <Text style={styles.arrowText}>›</Text>
-            </View>
-          </TouchableOpacity>
+          <View style={styles.cardWrapper}>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => router.push('/tabs/1-host')}
+            >
+              <Text style={styles.cardTitle}>Host Session</Text>
+              <Text style={styles.cardSubtitle}>Start a co-focus session</Text>
+              <View style={styles.cardArrow}>
+                <Text style={styles.arrowText}>›</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.blockedAppsSection}>
@@ -82,29 +90,35 @@ export default function Home() {
         </View>
 
         <View style={styles.motiMatesSection}>
-          <Text style={styles.motiMatesTitle}>Your MotiMates</Text>
           <View style={styles.friendsContainer}>
-            {friends.map((friend, index) => (
-              <View key={index} style={styles.friendItem}>
-                <View style={[styles.friendAvatar, { backgroundColor: '#DDD' }]}>
-                  <Text style={styles.friendInitial}>{friend.name.charAt(0)}</Text>
+            <Text style={styles.motiMatesTitle}>Your MotiMates</Text>
+            <View style={styles.friendsRow}>
+              {friends.map((friend, index) => (
+                <View key={index} style={styles.friendItem}>
+                  <View style={[styles.friendAvatar, { backgroundColor: '#DDD' }]}>
+                    <Text style={styles.friendInitial}>{friend.name.charAt(0)}</Text>
+                  </View>
+                  <Text style={styles.friendName}>{friend.name}</Text>
+                  <View style={[styles.statusDot, { backgroundColor: friend.color }]} />
+                  <Text style={styles.friendStatus}>{friend.status}</Text>
                 </View>
-                <Text style={styles.friendName}>{friend.name}</Text>
-                <View style={[styles.statusDot, { backgroundColor: friend.color }]} />
-                <Text style={styles.friendStatus}>{friend.status}</Text>
-              </View>
-            ))}
-            <TouchableOpacity style={styles.findMateButton}>
-              <View style={styles.findMateCircle}>
-                <Text style={styles.findMatePlus}>+</Text>
-              </View>
-              <Text style={styles.findMateText}>Find Mate</Text>
-            </TouchableOpacity>
+              ))}
+              <TouchableOpacity 
+                style={styles.findMateButton}
+                onPress={() => router.push('/friends')}
+              >
+                <View style={styles.findMateCircle}>
+                  <Text style={styles.findMatePlus}>+</Text>
+                </View>
+                <Text style={styles.findMateText}>Find Mate</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
+      </ImageBackground>
     </View>
   );
 }
@@ -114,12 +128,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#8B4513',
   },
-  gradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  background: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   scrollView: {
     flex: 1,
@@ -127,7 +139,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    marginBottom: 24,
+    marginBottom: 10,
   },
   welcomeText: {
     fontSize: 32,
@@ -159,8 +171,13 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   cardsContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 40,
     gap: 16,
+    alignItems: 'flex-start',
+    paddingLeft: 25,
+  },
+  cardWrapper: {
+    width: '82%',
   },
   actionCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
@@ -248,15 +265,17 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   motiMatesTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontFamily: 'Poppins_700Bold',
     color: '#000000',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   friendsContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
     borderRadius: 20,
     padding: 20,
+  },
+  friendsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },

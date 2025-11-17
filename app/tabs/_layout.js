@@ -1,21 +1,6 @@
 import { Tabs } from 'expo-router';
-import { View, Text } from 'react-native';
-
-function TabBarIcon({ name, focused }) {
-  const icons = {
-    host: '⏱',
-    friends: '👥',
-    home: '🏠',
-    profile: '👤',
-    settings: '⚙️',
-  };
-  
-  return (
-    <Text style={{ fontSize: 24, color: focused ? '#000' : '#999' }}>
-      {icons[name]}
-    </Text>
-  );
-}
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function TabsLayout() {
   return (
@@ -44,38 +29,48 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="host"
+        name="1-host"
         options={{
           title: 'Host',
-          tabBarIcon: ({ focused }) => <TabBarIcon name="host" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <MaterialCommunityIcons name="timer-outline" size={26} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="friends"
+        name="2-join"
         options={{
-          title: 'Friends',
-          tabBarIcon: ({ focused }) => <TabBarIcon name="friends" focused={focused} />,
+          title: 'Join',
+          tabBarIcon: ({ focused, color }) => (
+            <MaterialCommunityIcons name="account-group-outline" size={26} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="home"
+        name="3-home"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ focused }) => <TabBarIcon name="home" focused={focused} />,
+          title: '',
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons name="home" size={36} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="4-profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ focused }) => <TabBarIcon name="profile" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons name="person-outline" size={26} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="5-settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ focused }) => <TabBarIcon name="settings" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons name="settings-outline" size={26} color={color} />
+          ),
         }}
       />
     </Tabs>

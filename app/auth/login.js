@@ -9,9 +9,9 @@ export default function Login() {
   const [password, setPassword] = useState('');
 
   const handleLogin = () => {
-    // Simulated login - navigate to tabs
+    // Simulated login - navigate to home tab
     if (username && password) {
-      router.replace('/tabs/home');
+      router.replace('/tabs/3-home');
     }
   };
 
