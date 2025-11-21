@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 
@@ -6,11 +6,18 @@ export default function Host() {
   const router = useRouter();
   const [sessionName, setSessionName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
+  const [showError, setShowError] = useState(false);
 
   const handleNext = () => {
-    if (sessionName) {
-      router.push({ pathname: '/host/focus-goals', params: { sessionName, isPublic } });
+    if (!sessionName.trim()) {
+      setShowError(true);
+      setTimeout(() => {
+        setShowError(false);
+      }, 1500);
+      return;
     }
+
+    router.push({ pathname: '/host/focus-goals', params: { sessionName, isPublic: isPublic.toString() } });
   };
 
   return (
@@ -57,6 +64,14 @@ export default function Host() {
             <Text style={styles.nextButtonText}>Next</Text>
           </TouchableOpacity>
         </View>
+
+        <Modal transparent visible={showError} animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>Error: Please enter a session name!</Text>
+            </View>
+          </View>
+        </Modal>
       </ImageBackground>
     </View>
   );
@@ -139,5 +154,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    minWidth: 260,
+  },
+  errorText: {
+    fontSize: 16,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#B71C1C',
   },
 });

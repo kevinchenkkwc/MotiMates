@@ -75,15 +75,22 @@ export default function Home() {
           <Text style={styles.sectionTitle}>Blocked Apps</Text>
           <View style={styles.blockedAppsContainer}>
             {blockedApps.map((app, index) => (
-              <View key={index} style={styles.blockedAppCard}>
+              <TouchableOpacity 
+                key={index} 
+                style={styles.blockedAppCard}
+                onPress={() => router.push('/blocked-apps')}
+              >
                 <Text style={styles.blockedAppName}>{app.name}</Text>
                 <View style={styles.preventionRow}>
                   <Text style={styles.preventionText}>{app.preventions}</Text>
                   <Text style={styles.arrowText}>›</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.addButton}>
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => router.push('/blocked-apps')}
+            >
               <Text style={styles.addButtonText}>+</Text>
             </TouchableOpacity>
           </View>
@@ -171,7 +178,7 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   cardsContainer: {
-    paddingHorizontal: 40,
+    paddingHorizontal: 50,
     gap: 16,
     alignItems: 'flex-start',
     paddingLeft: 25,
@@ -219,7 +226,7 @@ const styles = StyleSheet.create({
   },
   blockedAppsContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   blockedAppCard: {
     backgroundColor: 'rgba(139, 69, 19, 0.6)',
@@ -227,7 +234,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.3)',
     padding: 16,
-    width: 150,
+    width: 140,
   },
   blockedAppName: {
     fontSize: 18,

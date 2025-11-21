@@ -5,31 +5,85 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function InviteMates() {
   const router = useRouter();
-  const { sessionName, goals, totalMinutes } = useLocalSearchParams();
+  const { sessionName, goals, totalMinutes, pomodoro, shortBreak, longBreak, usePomodoro, isPublic } = useLocalSearchParams();
   
-  const [friends] = useState([
-    { id: 1, name: 'Dominick', avatar: 'D' },
-    { id: 2, name: 'Kevin Chen', avatar: 'K' },
-    { id: 3, name: 'Steven Yoon', avatar: 'S' },
-    { id: 4, name: 'Eliot Walsh', avatar: 'E' },
-    { id: 5, name: 'Johnny Luo', avatar: 'J' },
-    { id: 6, name: 'Jannell', avatar: 'J' },
+  const [friends, setFriends] = useState([
+    { id: 1, name: 'Dominick', avatar: 'D', status: 'online', invited: false, accepted: false, declined: false },
+    { id: 2, name: 'Kevin Chen', avatar: 'K', status: 'online', invited: false, accepted: false, declined: false },
+    { id: 3, name: 'Steven Yoon', avatar: 'S', status: 'offline', invited: false, accepted: false, declined: false },
+    { id: 4, name: 'Eliot Walsh', avatar: 'E', status: 'online', invited: false, accepted: false, declined: false },
+    { id: 5, name: 'Johnny Luo', avatar: 'J', status: 'offline', invited: false, accepted: false, declined: false },
+    { id: 6, name: 'Jannell', avatar: 'J', status: 'online', invited: false, accepted: false, declined: false },
   ]);
-  
-  const [selectedFriends, setSelectedFriends] = useState([]);
 
-  const toggleFriend = (friendId) => {
-    setSelectedFriends(prev => 
-      prev.includes(friendId) 
-        ? prev.filter(id => id !== friendId)
-        : [...prev, friendId]
+  const handleInvite = (friendId) => {
+    // Immediately mark as invited, keep their current online/offline status
+    setFriends(prev =>
+      prev.map(friend => {
+        if (friend.id !== friendId) return friend;
+        if (friend.invited || friend.accepted || friend.declined) return friend;
+
+        return {
+          ...friend,
+          invited: true,
+        };
+      })
     );
+
+    // After a short delay, randomly accept or decline the invite
+    setTimeout(() => {
+      setFriends(prev =>
+        prev.map(friend => {
+          if (friend.id !== friendId) return friend;
+          // If they've already responded or invite was cleared, do nothing
+          if (!friend.invited || friend.accepted || friend.declined) return friend;
+
+          const accepted = Math.random() < 0.6;
+
+          if (accepted) {
+            return {
+              ...friend,
+              invited: false,
+              accepted: true,
+              declined: false,
+              status: 'in_session',
+            };
+          }
+
+          return {
+            ...friend,
+            invited: false,
+            accepted: false,
+            declined: true,
+          };
+        })
+      );
+    }, 2000);
   };
 
   const handleStartSession = () => {
+    const acceptedFriends = friends.filter(friend => friend.accepted);
+    const participants = [
+      { name: 'You', avatar: 'U' },
+      ...acceptedFriends.map(friend => ({ name: friend.name, avatar: friend.avatar })),
+    ];
+
+    const participantsParam = encodeURIComponent(JSON.stringify(participants));
+
     router.push({ 
-      pathname: '/session/active', 
-      params: { sessionName, goals, totalMinutes } 
+      pathname: '/session/wait', 
+      params: { 
+        mode: 'host',
+        sessionName, 
+        goals, 
+        totalMinutes, 
+        pomodoro,
+        shortBreak,
+        longBreak,
+        usePomodoro,
+        isPublic: isPublic || 'true',
+        participants: participantsParam,
+      } 
     });
   };
 
@@ -51,28 +105,56 @@ export default function InviteMates() {
           <Text style={styles.sectionTitle}>Invite Mates</Text>
 
           <ScrollView style={styles.friendsList} showsVerticalScrollIndicator={false}>
-            {friends.map((friend) => (
-              <TouchableOpacity
-                key={friend.id}
-                style={styles.friendItem}
-                onPress={() => toggleFriend(friend.id)}
-              >
-                <View style={styles.friendInfo}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{friend.avatar}</Text>
+            {friends.map((friend) => {
+              const statusLabel =
+                friend.status === 'online' ? 'Online' :
+                friend.status === 'offline' ? 'Offline' :
+                'In session';
+
+              return (
+                <TouchableOpacity
+                  key={friend.id}
+                  style={styles.friendItem}
+                  onPress={() => handleInvite(friend.id)}
+                >
+                  <View style={styles.friendInfo}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{friend.avatar}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.friendName}>{friend.name}</Text>
+                      <View style={styles.statusRow}>
+                        <View
+                          style={[
+                            styles.statusPill,
+                            friend.status === 'online' && styles.statusOnline,
+                            friend.status === 'offline' && styles.statusOffline,
+                            friend.status === 'in_session' && styles.statusInSession,
+                          ]}
+                        >
+                          <Text style={styles.statusText}>{statusLabel}</Text>
+                        </View>
+                        {(() => {
+                          let label = null;
+                          let style = styles.invitedText;
+
+                          if (friend.invited && !friend.accepted && !friend.declined) {
+                            label = 'Invited';
+                          } else if (friend.accepted) {
+                            label = 'Accepted invite';
+                          } else if (friend.declined) {
+                            label = 'Declined invite';
+                            style = styles.declinedText;
+                          }
+
+                          return label ? <Text style={style}>{label}</Text> : null;
+                        })()}
+                      </View>
+                    </View>
                   </View>
-                  <Text style={styles.friendName}>{friend.name}</Text>
-                </View>
-                <View style={[
-                  styles.checkbox,
-                  selectedFriends.includes(friend.id) && styles.checkboxActive
-                ]}>
-                  {selectedFriends.includes(friend.id) && (
-                    <Ionicons name="checkmark" size={18} color="#FFF" />
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
 
           <TouchableOpacity style={styles.startButton} onPress={handleStartSession}>
@@ -154,6 +236,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 8,
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#EEE',
+  },
+  statusOnline: {
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+  },
+  statusOffline: {
+    backgroundColor: 'rgba(158, 158, 158, 0.3)',
+  },
+  statusInSession: {
+    backgroundColor: 'rgba(33, 150, 243, 0.2)',
+  },
+  statusText: {
+    fontSize: 11,
+    fontFamily: 'Poppins_400Regular',
+    color: '#333',
+  },
+  invitedText: {
+    fontSize: 11,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#8B1E1E',
   },
   checkbox: {
     width: 24,

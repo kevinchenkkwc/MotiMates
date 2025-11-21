@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet, ImageBackground, ScrollView, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 
 export default function Profile() {
+  const router = useRouter();
   return (
     <View style={styles.container}>
       <ImageBackground
@@ -24,21 +26,33 @@ export default function Profile() {
           <View style={styles.blockedAppsSection}>
             <Text style={styles.sectionTitle}>Blocked Apps</Text>
             <View style={styles.blockedAppsRow}>
-              <TouchableOpacity style={styles.appCard}>
+              <TouchableOpacity 
+                style={styles.appCard}
+                onPress={() => router.push('/blocked-apps')}
+              >
                 <Text style={styles.appName}>Instagram</Text>
                 <Text style={styles.appStat}>x5 preventions</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.appCard}>
+              <TouchableOpacity 
+                style={styles.appCard}
+                onPress={() => router.push('/blocked-apps')}
+              >
                 <Text style={styles.appName}>TikTok</Text>
                 <Text style={styles.appStat}>x17 preventions</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.addAppCard}>
+              <TouchableOpacity 
+                style={styles.addAppCard}
+                onPress={() => router.push('/blocked-apps')}
+              >
                 <Text style={styles.addAppText}>+</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <TouchableOpacity style={styles.reflectionsButton}>
+          <TouchableOpacity
+            style={styles.reflectionsButton}
+            onPress={() => router.push('/profile/reflections')}
+          >
             <Text style={styles.reflectionsText}>Past Reflections</Text>
             <Text style={styles.reflectionsArrow}>›</Text>
           </TouchableOpacity>

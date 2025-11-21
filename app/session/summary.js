@@ -1,9 +1,10 @@
 import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, Modal, Keyboard } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
 export default function SessionSummary() {
   const router = useRouter();
+  const { sessionName, totalMinutes, endedEarly, goals } = useLocalSearchParams();
   const [productivity, setProductivity] = useState(0);
   const [reflection, setReflection] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
@@ -16,6 +17,32 @@ export default function SessionSummary() {
     }, 1500);
   };
 
+  const minutes = totalMinutes ? parseInt(totalMinutes) || 0 : 0;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const durationText = minutes
+    ? `${hours > 0 ? `${hours}h ` : ''}${mins}min`
+    : 'your co-focus session';
+
+  const early = endedEarly === 'true';
+
+  let goalsList = [];
+  let rawGoals = goals;
+
+  if (goals) {
+    try {
+      const decoded = decodeURIComponent(goals);
+      const parsed = JSON.parse(decoded);
+      if (Array.isArray(parsed)) {
+        goalsList = parsed;
+      } else {
+        rawGoals = decoded;
+      }
+    } catch (e) {
+      rawGoals = goals;
+    }
+  }
+
   return (
     <View style={styles.container}>
       <ImageBackground
@@ -24,11 +51,56 @@ export default function SessionSummary() {
         resizeMode="cover"
       >
         <View style={styles.content}>
-          <Text style={styles.title}>End Summary</Text>
+          <Text style={styles.title}>{early ? 'Request Approved' : 'End Summary'}</Text>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Congratulations!</Text>
-            <Text style={styles.cardSubtitle}>You've just completed a 2h 45min co-focus session!</Text>
+            <Text style={styles.cardTitle}>
+              {early ? `Session ended early${sessionName ? '' : ''}` : 'Congratulations!'}
+            </Text>
+            <Text style={styles.cardSubtitle}>
+              {early
+                ? `You've logged ${durationText} of co-focus time.`
+                : "You've just completed a co-focus session!"}
+            </Text>
+
+            {goalsList.length > 0 ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Focus Goals</Text>
+                {goalsList.map((goal) => (
+                  <Text
+                    key={goal.id}
+                    style={[
+                      styles.goalsText,
+                      goal.completed && styles.goalsTextCompleted,
+                    ]}
+                  >
+                    {goal.completed ? '✓ ' : '• '}
+                    {goal.text}
+                  </Text>
+                ))}
+              </View>
+            ) : rawGoals ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Focus Goals</Text>
+                <Text style={styles.goalsText}>{rawGoals}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Focus Partners</Text>
+              <View style={styles.partnersRow}>
+                <View style={styles.partnerAvatar}>
+                  <Text style={styles.partnerAvatarText}>K</Text>
+                </View>
+                <View style={styles.partnerAvatar}>
+                  <Text style={styles.partnerAvatarText}>D</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Duration: {durationText}</Text>
+            </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Rate Productivity</Text>
@@ -96,14 +168,14 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 30,
-    paddingTop: 80,
-    paddingBottom: 40,
+    paddingTop: 64,
+    paddingBottom: 32,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
-    marginBottom: 24,
+    marginBottom: 18,
   },
   card: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -112,25 +184,61 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   cardTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
     marginBottom: 8,
   },
   cardSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     marginBottom: 24,
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   sectionLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
     marginBottom: 12,
+  },
+  goalsText: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    color: '#333',
+    lineHeight: 18,
+  },
+  goalsTextCompleted: {
+    textDecorationLine: 'line-through',
+    color: '#666',
+  },
+  goalsGroup: {
+    marginBottom: 8,
+  },
+  goalsGroupLabel: {
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#555',
+    marginBottom: 4,
+  },
+  partnersRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  partnerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#DDD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  partnerAvatarText: {
+    fontSize: 16,
+    fontFamily: 'Poppins_700Bold',
+    color: '#666',
   },
   ratingRow: {
     flexDirection: 'row',

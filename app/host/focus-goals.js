@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, Keyboard, TouchableWithoutFeedback, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,29 +7,76 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 export default function FocusGoals() {
   const router = useRouter();
   const { sessionName, isPublic } = useLocalSearchParams();
-  const [goals, setGoals] = useState('');
+  const [goalItems, setGoalItems] = useState([]);
+  const [newGoal, setNewGoal] = useState('');
+
+  const addGoal = () => {
+    const text = newGoal.trim();
+    if (!text) return;
+    setGoalItems((prev) => [
+      ...prev,
+      { id: Date.now().toString(), text, completed: false },
+    ]);
+    setNewGoal('');
+  };
 
   const handleNext = () => {
-    router.push({ 
-      pathname: '/host/set-timer', 
-      params: { sessionName, isPublic, goals } 
+    // If the user typed a goal but didn't tap Add, include it
+    let items = goalItems;
+    const text = newGoal.trim();
+    if (text) {
+      items = [
+        ...goalItems,
+        { id: Date.now().toString(), text, completed: false },
+      ];
+    }
+
+    const goalsParam =
+      items.length > 0 ? encodeURIComponent(JSON.stringify(items)) : '';
+
+    router.push({
+      pathname: '/host/set-timer',
+      params: {
+        sessionName,
+        isPublic: isPublic || 'true',
+        goals: goalsParam,
+      },
+    });
+  };
+
+  const handleSkip = () => {
+    const goalsParam =
+      goalItems.length > 0 ? encodeURIComponent(JSON.stringify(goalItems)) : '';
+
+    router.push({
+      pathname: '/host/set-timer',
+      params: {
+        sessionName,
+        isPublic: isPublic || 'true',
+        goals: goalsParam,
+      },
     });
   };
 
   return (
-    <View style={styles.container}>
-      <ImageBackground
-        source={require('../../assets/background.png')}
-        style={styles.background}
-        resizeMode="cover"
-      >
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        <ImageBackground
+          source={require('../../assets/background.png')}
+          style={styles.background}
+          resizeMode="cover"
+        >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={28} color="#FFF" />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentInner}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={styles.sessionName}>{sessionName}</Text>
           
           <View style={styles.titleContainer}>
@@ -37,25 +84,43 @@ export default function FocusGoals() {
             <MaterialCommunityIcons name="pencil" size={24} color="#FFFFFF" />
           </View>
 
-          <TextInput
-            style={styles.textArea}
-            value={goals}
-            onChangeText={setGoals}
-            placeholder="• What do you want to accomplish?&#10;• Break down your tasks&#10;• Set specific goals"
-            placeholderTextColor="#999"
-            multiline
-            numberOfLines={8}
-            textAlignVertical="top"
-            returnKeyType="done"
-            blurOnSubmit={true}
-          />
+          <View style={styles.goalsContent}>
+            {goalItems.map((goal) => (
+              <View key={goal.id} style={styles.goalRow}>
+                <View style={styles.goalCheckbox}>
+                  <Ionicons name="square-outline" size={18} color="#FFFFFF" />
+                </View>
+                <Text style={styles.goalText}>{goal.text}</Text>
+              </View>
+            ))}
+
+            <View style={styles.addRow}>
+              <TextInput
+                style={styles.addInput}
+                value={newGoal}
+                onChangeText={setNewGoal}
+                placeholder="Add a new goal..."
+                placeholderTextColor="#999"
+                returnKeyType="done"
+                onSubmitEditing={addGoal}
+              />
+              <TouchableOpacity style={styles.addButton} onPress={addGoal}>
+                <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
             <Text style={styles.nextButtonText}>Next</Text>
           </TouchableOpacity>
-        </View>
+
+          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+            <Text style={styles.skipButtonText}>Skip for now</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </ImageBackground>
     </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -79,8 +144,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentInner: {
     paddingHorizontal: 30,
     paddingTop: 20,
+    paddingBottom: 32,
   },
   sessionName: {
     fontSize: 14,
@@ -99,15 +167,55 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
   },
-  textArea: {
+  goalsScroll: {
+    flex: 1,
+    marginBottom: 24,
+  },
+  goalsContent: {
+    paddingBottom: 8,
+  },
+  goalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  goalCheckbox: {
+    width: 22,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  goalText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#FFFFFF',
+  },
+  addRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  addInput: {
+    flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 12,
-    padding: 20,
-    fontSize: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#000',
-    minHeight: 200,
-    marginBottom: 32,
+  },
+  addButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  addButtonText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#8B1E1E',
   },
   nextButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -119,5 +227,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
+  },
+  skipButton: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  skipButtonText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: 'rgba(255, 255, 255, 0.85)',
   },
 });

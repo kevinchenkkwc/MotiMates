@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { useFonts, Poppins_400Regular, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
 import * as SplashScreen from 'expo-splash-screen';
+import { Asset } from 'expo-asset';
 import { useEffect } from 'react';
 
 // Prevent the splash screen from auto-hiding
@@ -14,9 +15,19 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
+    async function prepare() {
+      if (!fontsLoaded) return;
+
+      try {
+        await Asset.fromModule(require('../assets/background.png')).downloadAsync();
+      } catch (e) {
+        // If preloading fails, continue anyway.
+      } finally {
+        SplashScreen.hideAsync();
+      }
     }
+
+    prepare();
   }, [fontsLoaded]);
 
   if (!fontsLoaded) {
@@ -31,6 +42,8 @@ export default function RootLayout() {
       <Stack.Screen name="host" />
       <Stack.Screen name="session" />
       <Stack.Screen name="friends" />
+      <Stack.Screen name="profile" />
+      <Stack.Screen name="blocked-apps" />
     </Stack>
   );
 }
