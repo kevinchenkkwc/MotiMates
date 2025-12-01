@@ -1,12 +1,15 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { createActiveSession, joinSessionById } from '../../utils/api';
+import { supabase } from '../../utils/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function InviteMates() {
   const router = useRouter();
   const { sessionName, goals, totalMinutes, pomodoro, shortBreak, longBreak, usePomodoro, isPublic } = useLocalSearchParams();
   
+  const [loading, setLoading] = useState(false);
   const [friends, setFriends] = useState([
     { id: 1, name: 'Dominick', avatar: 'D', status: 'online', invited: false, accepted: false, declined: false },
     { id: 2, name: 'Kevin Chen', avatar: 'K', status: 'online', invited: false, accepted: false, declined: false },
@@ -61,30 +64,55 @@ export default function InviteMates() {
     }, 2000);
   };
 
-  const handleStartSession = () => {
-    const acceptedFriends = friends.filter(friend => friend.accepted);
-    const participants = [
-      { name: 'You', avatar: 'U' },
-      ...acceptedFriends.map(friend => ({ name: friend.name, avatar: friend.avatar })),
-    ];
+  const handleStartSession = async () => {
+    if (loading) return;
 
-    const participantsParam = encodeURIComponent(JSON.stringify(participants));
+    try {
+      setLoading(true);
 
-    router.push({ 
-      pathname: '/session/wait', 
-      params: { 
-        mode: 'host',
-        sessionName, 
-        goals, 
-        totalMinutes, 
-        pomodoro,
-        shortBreak,
-        longBreak,
-        usePomodoro,
-        isPublic: isPublic || 'true',
-        participants: participantsParam,
-      } 
-    });
+      // Create session in Supabase
+      const isPomodoroMode = String(usePomodoro) === 'true';
+      const session = await createActiveSession({
+        name: sessionName,
+        isPublic: String(isPublic) === 'true',
+        mode: isPomodoroMode ? 'pomodoro' : 'uninterrupted',
+        workMinutes: parseInt(pomodoro) || null,
+        shortBreakMinutes: isPomodoroMode ? (parseInt(shortBreak) || null) : null,
+        longBreakMinutes: isPomodoroMode ? (parseInt(longBreak) || null) : null,
+      });
+
+      // Host auto-joins the session
+      await joinSessionById(session.id);
+
+      // Broadcast session creation so Join tab updates
+      const channel = supabase.channel('public-sessions-broadcast');
+      await channel.send({
+        type: 'broadcast',
+        event: 'session_created',
+        payload: { sessionId: session.id },
+      });
+
+      // Navigate to share code screen
+      router.push({
+        pathname: '/host/share-code',
+        params: {
+          sessionId: session.id,
+          sessionName: session.name,
+          inviteCode: session.invite_code,
+          goals,
+          totalMinutes,
+          pomodoro,
+          shortBreak,
+          longBreak,
+          usePomodoro,
+          isPublic,
+        },
+      });
+    } catch (e) {
+      alert(e.message || 'Failed to create session');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -157,8 +185,16 @@ export default function InviteMates() {
             })}
           </ScrollView>
 
-          <TouchableOpacity style={styles.startButton} onPress={handleStartSession}>
-            <Text style={styles.startButtonText}>Start Session</Text>
+          <TouchableOpacity 
+            style={[styles.startButton, loading && styles.startButtonDisabled]} 
+            onPress={handleStartSession}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.startButtonText}>Start Session</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ImageBackground>
@@ -287,6 +323,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 40,
+  },
+  startButtonDisabled: {
+    opacity: 0.6,
   },
   startButtonText: {
     fontSize: 18,

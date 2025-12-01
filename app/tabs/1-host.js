@@ -44,7 +44,7 @@ export default function Host() {
             blurOnSubmit={true}
           />
 
-          <Text style={styles.label}>Soon Accessible</Text>
+          <Text style={styles.label}>Room Accessibility</Text>
           <View style={styles.toggleContainer}>
             <TouchableOpacity
               style={[styles.toggleButton, isPublic && styles.toggleButtonActive]}

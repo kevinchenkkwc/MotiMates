@@ -1,86 +1,177 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { getSessionParticipants, getFocusGoals, getCurrentUser, endSession, createUnlockRequest, voteOnUnlockRequest, getPendingUnlockRequests } from '../../utils/api';
+import { supabase } from '../../utils/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { responsive } from '../../utils/responsive';
 
 export default function ActiveSession() {
   const router = useRouter();
   const {
+    sessionId,
     sessionName,
-    goals,
     totalMinutes,
-    exitDeclined,
-    isPublic,
-    participants,
     pomodoro,
     shortBreak,
     longBreak,
     usePomodoro,
+    exitDeclined,
+    startTime,
   } = useLocalSearchParams();
   
-  const initialSeconds = totalMinutes ? parseInt(totalMinutes) * 60 : 2670;
-  const [timeLeft, setTimeLeft] = useState(initialSeconds);
-
-  let initialGoalItems = [];
-  let rawGoals = goals;
-
-  if (goals) {
-    try {
-      const decoded = decodeURIComponent(goals);
-      const parsed = JSON.parse(decoded);
-      if (Array.isArray(parsed)) {
-        initialGoalItems = parsed;
-      } else {
-        rawGoals = decoded;
-      }
-    } catch (e) {
-      rawGoals = goals;
-    }
-  }
-
-  const [goalItems, setGoalItems] = useState(initialGoalItems);
-  const [started, setStarted] = useState(false);
-
-  let participantsList = [];
-  if (participants) {
-    try {
-      const decoded = decodeURIComponent(participants);
-      participantsList = JSON.parse(decoded);
-    } catch (e) {
-      participantsList = [];
-    }
-  }
-
-  if (!participantsList || participantsList.length === 0) {
-    participantsList = [
-      { name: 'Kevin', avatar: 'K' },
-      { name: 'Derek', avatar: 'D' },
-    ];
-  }
+  const sessionStartTime = useRef(startTime ? parseInt(startTime) : Date.now());
+  const totalDuration = totalMinutes ? parseInt(totalMinutes) * 60 : 3600;
+  const [timeLeft, setTimeLeft] = useState(totalDuration);
+  const [goalItems, setGoalItems] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const currentUserIdRef = useRef(null);
+  const channelRef = useRef(null);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [unlockReason, setUnlockReason] = useState('');
+  const [pendingRequest, setPendingRequest] = useState(null);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [incomingRequest, setIncomingRequest] = useState(null);
 
   useEffect(() => {
-    if (!started) return;
+    loadSessionData();
+    setupRealtimeSubscription();
+  }, []);
 
-    const interval = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          router.push({
-            pathname: '/session/summary',
-            params: {
-              sessionName,
-              totalMinutes: totalMinutes?.toString() || '0',
-              goals: buildGoalsParam(),
-            },
-          });
-          return 0;
+  const loadSessionData = async () => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        router.replace('/auth/login');
+        return;
+      }
+      setCurrentUserId(user.id);
+      currentUserIdRef.current = user.id;
+
+      // Load participants
+      const parts = await getSessionParticipants(sessionId);
+      setParticipants(parts);
+
+      // Load my goals
+      const goals = await getFocusGoals(sessionId, user.id);
+      setGoalItems(goals);
+    } catch (e) {
+      console.error('Failed to load session data:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const setupRealtimeSubscription = () => {
+    const channel = supabase
+      .channel(`session:${sessionId}`)
+      .on('broadcast', { event: 'participant_change' }, async (payload) => {
+        console.log('[Active] Participant change broadcast:', payload);
+        try {
+          const parts = await getSessionParticipants(sessionId);
+          setParticipants(parts);
+        } catch (e) {
+          console.error('Failed to reload participants:', e);
         }
-        return prev - 1;
-      });
+      })
+      .on('broadcast', { event: 'unlock_request' }, (payload) => {
+        console.log('[Broadcast] Unlock request:', payload);
+        const myId = currentUserIdRef.current;
+        // Show modal for other participants to vote (not the requester)
+        if (payload.payload.requesterId && payload.payload.requesterId !== myId) {
+          setIncomingRequest(payload.payload);
+          setShowRequestModal(true);
+        }
+      })
+      .on('broadcast', { event: 'unlock_resolved' }, (payload) => {
+        console.log('[Broadcast] Unlock resolved:', payload);
+        const myId = currentUserIdRef.current;
+        const isRequester = payload.payload.requesterId === myId;
+
+        if (!isRequester) return;
+
+        if (payload.payload.status === 'approved') {
+          // Clear pending state and let the requester leave the session
+          setPendingRequest(null);
+          Alert.alert(
+            'Request Approved',
+            'Your mates approved. You can now leave the session.',
+            [
+              { text: 'Stay', style: 'cancel' },
+              {
+                text: 'Leave',
+                onPress: () => {
+                  // Navigate to early exit reflection
+                  router.replace({
+                    pathname: '/session/early-exit',
+                    params: {
+                      sessionId,
+                      sessionName,
+                      reason: payload.payload.reason || 'Approved exit',
+                    },
+                  });
+                },
+              },
+            ],
+          );
+        } else if (payload.payload.status === 'rejected') {
+          setPendingRequest(null);
+          Alert.alert('Request Denied', 'Your unlock request was denied by your study mates');
+        }
+      })
+      .subscribe();
+
+    channelRef.current = channel;
+
+    // Poll for participant updates every 5 seconds
+    const interval = setInterval(async () => {
+      try {
+        const parts = await getSessionParticipants(sessionId);
+        setParticipants(parts);
+      } catch (e) {
+        console.error('Failed to poll participants:', e);
+      }
+    }, 5000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  };
+
+  const participantsList = participants.map(p => ({
+    name: p.profiles?.display_name || 'User',
+    avatar: (p.profiles?.display_name || 'U').charAt(0).toUpperCase(),
+    id: p.user_id,
+  }));
+
+  // Synced timer - calculates based on shared start time
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - sessionStartTime.current) / 1000);
+      const remaining = totalDuration - elapsed;
+      
+      if (remaining <= 0) {
+        clearInterval(interval);
+        handleEndSession();
+        router.push({
+          pathname: '/session/summary',
+          params: {
+            sessionId,
+            sessionName,
+            totalMinutes: totalMinutes?.toString() || '0',
+          },
+        });
+        setTimeLeft(0);
+      } else {
+        setTimeLeft(remaining);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [started]);
+  }, []);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -88,45 +179,152 @@ export default function ActiveSession() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const toggleGoal = (id) => {
+  const toggleGoal = async (id) => {
+    const goal = goalItems.find(g => g.id === id);
+    if (!goal) return;
+
+    const newCompleted = !goal.is_completed;
+    
+    // Optimistically update UI
     setGoalItems((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, completed: !item.completed } : item
+        item.id === id ? { ...item, is_completed: newCompleted } : item
       )
     );
-  };
 
-  const buildGoalsParam = () => {
-    if (goalItems && goalItems.length > 0) {
-      try {
-        return encodeURIComponent(JSON.stringify(goalItems));
-      } catch (e) {
-        // fall through
-      }
+    // Update in database
+    try {
+      const { updateGoalCompletion } = require('../../utils/api');
+      await updateGoalCompletion(id, newCompleted);
+    } catch (e) {
+      console.error('Failed to update goal:', e);
+      // Revert on error
+      setGoalItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, is_completed: !newCompleted } : item
+        )
+      );
     }
-    return rawGoals || '';
   };
 
-  const handleSkip = () => {
-    router.push({
-      pathname: '/session/summary',
-      params: {
-        sessionName,
-        totalMinutes: totalMinutes?.toString() || '0',
-        goals: buildGoalsParam(),
-      },
-    });
+  const handleEndSession = async () => {
+    try {
+      await endSession(sessionId);
+    } catch (e) {
+      console.error('Failed to end session:', e);
+    }
   };
 
-  const handleRequestExit = () => {
-    router.push({
-      pathname: '/session/request-exit',
-      params: {
-        sessionName,
-        totalMinutes: totalMinutes?.toString() || '0',
-        goals: buildGoalsParam(),
-      },
-    });
+  const handleExitRequest = () => {
+    if (pendingRequest) {
+      Alert.alert('Request Pending', 'You already have a pending unlock request');
+    } else {
+      setShowUnlockModal(true);
+    }
+  };
+
+  const handleRequestUnlock = async () => {
+    if (!unlockReason.trim()) {
+      Alert.alert('Error', 'Please provide a reason for leaving');
+      return;
+    }
+
+    try {
+      const savedReason = unlockReason;
+      setShowUnlockModal(false);
+      setUnlockReason('');
+
+      // Auto-approve if alone (no other participants)
+      if (participants.length === 1) {
+        Alert.alert(
+          'Exit Approved',
+          'You are alone in this session.',
+          [
+            { text: 'Stay', style: 'cancel' },
+            {
+              text: 'Leave',
+              onPress: () => {
+                router.replace({
+                  pathname: '/session/early-exit',
+                  params: {
+                    sessionId,
+                    sessionName,
+                    reason: savedReason,
+                  },
+                });
+              },
+            },
+          ],
+        );
+        return;
+      }
+
+      const request = await createUnlockRequest(sessionId, savedReason, participants.length);
+      setPendingRequest(request);
+
+      // Broadcast to others using existing channel
+      if (channelRef.current) {
+        console.log('[Unlock] Broadcasting request to channel');
+        await channelRef.current.send({
+          type: 'broadcast',
+          event: 'unlock_request',
+          payload: {
+            requestId: request.id,
+            requesterId: currentUserId,
+            requesterName: participants.find(p => p.user_id === currentUserId)?.profiles?.display_name || 'User',
+            reason: savedReason,
+          },
+        });
+      }
+
+      Alert.alert(
+        'Request Sent',
+        `Waiting for ${participants.length - 1} mate(s) to approve...`,
+        [{ text: 'OK' }]
+      );
+    } catch (e) {
+      console.error('[Unlock] Failed:', e);
+      Alert.alert('Error', e.message || 'Failed to send request');
+    }
+  };
+
+  const handleVoteOnRequest = async (vote) => {
+    try {
+      const requestId = incomingRequest.requestId;
+      const requesterId = incomingRequest.requesterId;
+      const reason = incomingRequest.reason;
+
+      const result = await voteOnUnlockRequest(requestId, vote);
+      setShowRequestModal(false);
+      setIncomingRequest(null);
+
+      // If resolved, broadcast result using existing channel
+      if (result.status !== 'pending' && channelRef.current) {
+        console.log('[Unlock] Broadcasting resolution:', result.status);
+        await channelRef.current.send({
+          type: 'broadcast',
+          event: 'unlock_resolved',
+          payload: {
+            requestId,
+            requesterId,
+            status: result.status,
+            reason,
+          },
+        });
+      }
+
+      Alert.alert(
+        vote === 'approve' ? 'Vote Recorded' : 'Request Denied',
+        vote === 'approve' 
+          ? result.status === 'approved'
+            ? 'All votes received - Request approved!'
+            : `Approved (${result.approveCount}/${participants.length - 1} needed)`
+          : 'The request has been denied'
+      );
+    } catch (e) {
+      console.error('[Unlock] Vote failed:', e);
+      Alert.alert('Error', e.message || 'Failed to vote');
+    }
   };
 
   const pomodoroOn = String(usePomodoro) === 'true';
@@ -189,6 +387,23 @@ export default function ActiveSession() {
     }
   }
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ImageBackground
+          source={require('../../assets/background.png')}
+          style={styles.background}
+          resizeMode="cover"
+        >
+          <View style={styles.centerContent}>
+            <ActivityIndicator size="large" color="#FFF" />
+            <Text style={styles.loadingText}>Loading session...</Text>
+          </View>
+        </ImageBackground>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ImageBackground
@@ -204,11 +419,6 @@ export default function ActiveSession() {
           )}
           <View style={styles.sessionHeader}>
             <Text style={styles.title}>In Session</Text>
-            {isPublic && (
-              <View style={[styles.sessionTypePill, isPublic === 'true' ? styles.publicPill : styles.privatePill]}>
-                <Text style={styles.sessionTypeText}>{isPublic === 'true' ? 'Public' : 'Private'}</Text>
-              </View>
-            )}
           </View>
           <Text style={styles.subtitle}>{sessionName || "WE'RE LOCKED IN"}</Text>
 
@@ -237,7 +447,7 @@ export default function ActiveSession() {
                     onPress={() => toggleGoal(item.id)}
                   >
                     <Ionicons
-                      name={item.completed ? 'checkbox-outline' : 'square-outline'}
+                      name={item.is_completed ? 'checkbox-outline' : 'square-outline'}
                       size={18}
                       color="#000"
                       style={styles.goalCheckbox}
@@ -245,16 +455,16 @@ export default function ActiveSession() {
                     <Text
                       style={[
                         styles.goalText,
-                        item.completed && styles.goalTextCompleted,
+                        item.is_completed && styles.goalTextCompleted,
                       ]}
                     >
-                      {item.text}
+                      {item.goal_text || item.text}
                     </Text>
                   </TouchableOpacity>
                 ))
               ) : (
                 <Text style={styles.goalText}>
-                  {rawGoals || "• Stay focused\n• Complete your tasks"}
+                  • Stay focused{'\n'}• Complete your tasks
                 </Text>
               )}
             </View>
@@ -274,29 +484,98 @@ export default function ActiveSession() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.exitButton} onPress={handleRequestExit}>
-            <Text style={styles.exitButtonText}>Request Unlock</Text>
+          <TouchableOpacity 
+            style={[styles.exitButton, pendingRequest && styles.exitButtonPending]} 
+            onPress={handleExitRequest}
+            disabled={!!pendingRequest}
+          >
+            <Ionicons name="lock-open-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
+            <Text style={styles.exitButtonText}>
+              {pendingRequest ? 'Request Pending...' : 'Request Unlock'}
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <Text style={styles.skipButtonText}>DEV SKIP</Text>
-          </TouchableOpacity>
         </View>
-        {!started && (
-          <TouchableOpacity
-            style={styles.readyOverlay}
-            activeOpacity={1}
-            onPress={() => setStarted(true)}
-          >
-            <View style={styles.readyBlock}>
-              <Text style={styles.readyTitle}>Ready to start?</Text>
-              <Text style={styles.readySubtitle}>
-                Take a breath. Tap anywhere to begin.
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
       </ImageBackground>
+
+      {/* Unlock Request Modal */}
+      <Modal
+        visible={showUnlockModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowUnlockModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Request to Leave</Text>
+            <Text style={styles.modalSubtitle}>
+              All {participants.length - 1} study mate(s) must approve
+            </Text>
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="Why do you need to leave? (required)"
+              placeholderTextColor="#999"
+              value={unlockReason}
+              onChangeText={setUnlockReason}
+              multiline
+              numberOfLines={3}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => {
+                  setShowUnlockModal(false);
+                  setUnlockReason('');
+                }}
+              >
+                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSubmit]}
+                onPress={handleRequestUnlock}
+              >
+                <Text style={styles.modalButtonTextSubmit}>Send Request</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Incoming Request Modal */}
+      <Modal
+        visible={showRequestModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowRequestModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="alert-circle" size={48} color="#FF9800" style={{ marginBottom: 12 }} />
+            <Text style={styles.modalTitle}>Unlock Request</Text>
+            <Text style={styles.requestFromText}>
+              {incomingRequest?.requesterName} wants to leave
+            </Text>
+            <View style={styles.reasonBox}>
+              <Text style={styles.reasonLabel}>Reason:</Text>
+              <Text style={styles.reasonText}>{incomingRequest?.reason}</Text>
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonReject]}
+                onPress={() => handleVoteOnRequest('reject')}
+              >
+                <Text style={styles.modalButtonTextReject}>Deny</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonApprove]}
+                onPress={() => handleVoteOnRequest('approve')}
+              >
+                <Text style={styles.modalButtonTextApprove}>Approve</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -316,6 +595,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingTop: 80,
     paddingBottom: 40,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontFamily: 'Poppins_400Regular',
+    color: '#FFF',
   },
   bannerDeclined: {
     backgroundColor: 'rgba(183, 28, 28, 0.9)',
@@ -498,27 +788,129 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   exitButton: {
+    flexDirection: 'row',
     backgroundColor: '#B71C1C',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
+  },
+  exitButtonPending: {
+    backgroundColor: '#999',
   },
   exitButtonText: {
     fontSize: 14,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
   },
-  skipButton: {
-    backgroundColor: '#FFB84D',
-    borderRadius: 12,
-    paddingVertical: 12,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    padding: responsive.padding.lg,
   },
-  skipButtonText: {
-    fontSize: 14,
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: responsive.isTablet ? 30 : 20,
+    padding: responsive.padding.lg,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: responsive.fontSize.xxl,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
+    marginBottom: responsive.padding.sm,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    marginBottom: responsive.padding.md,
+    textAlign: 'center',
+  },
+  reasonInput: {
+    width: '100%',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: responsive.padding.md,
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_400Regular',
+    color: '#000',
+    marginBottom: responsive.padding.md,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  requestFromText: {
+    fontSize: responsive.fontSize.lg,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#000',
+    marginBottom: responsive.padding.md,
+    textAlign: 'center',
+  },
+  reasonBox: {
+    width: '100%',
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    padding: responsive.padding.md,
+    marginBottom: responsive.padding.md,
+  },
+  reasonLabel: {
+    fontSize: responsive.fontSize.sm,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#666',
+    marginBottom: responsive.padding.xs,
+  },
+  reasonText: {
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_400Regular',
+    color: '#000',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: responsive.padding.sm,
+    width: '100%',
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: responsive.padding.md,
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: '#F5F5F5',
+  },
+  modalButtonTextCancel: {
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#666',
+  },
+  modalButtonSubmit: {
+    backgroundColor: '#8B1E1E',
+  },
+  modalButtonTextSubmit: {
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#FFF',
+  },
+  modalButtonReject: {
+    backgroundColor: '#F5F5F5',
+  },
+  modalButtonTextReject: {
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#B71C1C',
+  },
+  modalButtonApprove: {
+    backgroundColor: '#4CAF50',
+  },
+  modalButtonTextApprove: {
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#FFF',
   },
 });

@@ -1,14 +1,16 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { saveFocusGoals } from '../../utils/api';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 export default function SessionGoals() {
   const router = useRouter();
-  const { sessionName, totalMinutes } = useLocalSearchParams();
+  const { sessionId, sessionName, totalMinutes } = useLocalSearchParams();
   const [goalItems, setGoalItems] = useState([]);
   const [newGoal, setNewGoal] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const addGoal = () => {
     const text = newGoal.trim();
@@ -20,7 +22,9 @@ export default function SessionGoals() {
     setNewGoal('');
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (loading) return;
+
     let items = goalItems;
     const text = newGoal.trim();
     if (text) {
@@ -30,18 +34,28 @@ export default function SessionGoals() {
       ];
     }
 
-    const goalsParam =
-      items.length > 0 ? encodeURIComponent(JSON.stringify(items)) : '';
+    try {
+      setLoading(true);
 
-    router.push({
-      pathname: '/session/wait',
-      params: {
-        mode: 'join',
-        sessionName,
-        goals: goalsParam,
-        totalMinutes,
-      },
-    });
+      // Save goals to Supabase
+      if (items.length > 0) {
+        await saveFocusGoals(sessionId, items);
+      }
+
+      // Navigate to lobby
+      router.push({
+        pathname: '/session/lobby',
+        params: {
+          sessionId,
+          sessionName,
+          totalMinutes,
+        },
+      });
+    } catch (e) {
+      alert(e.message || 'Failed to save goals');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -99,8 +113,16 @@ export default function SessionGoals() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-            <Text style={styles.nextButtonText}>Join Session</Text>
+          <TouchableOpacity 
+            style={[styles.nextButton, loading && { opacity: 0.6 }]} 
+            onPress={handleNext}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.nextButtonText}>Join Session</Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </ImageBackground>

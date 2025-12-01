@@ -1,9 +1,71 @@
-import { View, Text, StyleSheet, ImageBackground, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { getCurrentUserProfile, updateUserProfile } from '../../utils/api';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function Profile() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [editingBio, setEditingBio] = useState(false);
+  const [bioText, setBioText] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const data = await getCurrentUserProfile();
+      setProfile(data);
+      setBioText(data?.bio || '');
+    } catch (e) {
+      alert('Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveBio = async () => {
+    try {
+      setSaving(true);
+      await updateUserProfile({ bio: bioText });
+      setProfile({ ...profile, bio: bioText });
+      setEditingBio(false);
+    } catch (e) {
+      alert('Failed to save bio');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ImageBackground
+          source={require('../../assets/background.png')}
+          style={styles.background}
+          resizeMode="cover"
+        >
+          <View style={styles.centerContent}>
+            <ActivityIndicator size="large" color="#FFF" />
+          </View>
+        </ImageBackground>
+      </View>
+    );
+  }
+
+  const username = profile?.display_name || 'User';
+  const initial = username.charAt(0).toUpperCase();
+  const bio = profile?.bio || 'No bio yet. Tap to add one!';
+
   return (
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
     <View style={styles.container}>
       <ImageBackground
         source={require('../../assets/background.png')}
@@ -17,10 +79,54 @@ export default function Profile() {
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.profileCard}>
             <View style={styles.profileImagePlaceholder}>
-              <Text style={styles.profileInitial}>H</Text>
+              <Text style={styles.profileInitial}>{initial}</Text>
             </View>
-            <Text style={styles.profileHandle}>@hhycheng</Text>
-            <Text style={styles.profileSchool}>Stanford University</Text>
+            <Text style={styles.profileHandle}>@{username.toLowerCase().replace(/\s+/g, '')}</Text>
+            
+            {!editingBio ? (
+              <TouchableOpacity 
+                style={styles.bioContainer}
+                onPress={() => setEditingBio(true)}
+              >
+                <Text style={styles.bioText}>{bio}</Text>
+                <Ionicons name="create-outline" size={18} color="#8B1E1E" style={styles.editIcon} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.bioEditContainer}>
+                <TextInput
+                  style={styles.bioInput}
+                  value={bioText}
+                  onChangeText={setBioText}
+                  placeholder="Write your bio..."
+                  placeholderTextColor="#999"
+                  multiline
+                  maxLength={150}
+                  autoFocus
+                />
+                <View style={styles.bioActions}>
+                  <TouchableOpacity 
+                    style={styles.bioCancel}
+                    onPress={() => {
+                      setBioText(profile?.bio || '');
+                      setEditingBio(false);
+                    }}
+                  >
+                    <Text style={styles.bioCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.bioSave, saving && { opacity: 0.6 }]}
+                    onPress={handleSaveBio}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text style={styles.bioSaveText}>Save</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
 
           <View style={styles.blockedAppsSection}>
@@ -86,15 +192,17 @@ export default function Profile() {
 
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>127</Text>
+              <Text style={styles.statNumber}>{profile?.total_sessions || 0}</Text>
               <Text style={styles.statLabel}>Sessions</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>67h</Text>
+              <Text style={styles.statNumber}>
+                {Math.floor((profile?.total_focus_minutes || 0) / 60)}h
+              </Text>
               <Text style={styles.statLabel}>Focused</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>17</Text>
+              <Text style={styles.statNumber}>{profile?.current_streak_days || 0}</Text>
               <Text style={styles.statLabel}>Streak</Text>
             </View>
           </View>
@@ -103,6 +211,7 @@ export default function Profile() {
         </ScrollView>
       </ImageBackground>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -158,10 +267,71 @@ const styles = StyleSheet.create({
     color: '#000',
     marginBottom: 4,
   },
-  profileSchool: {
+  bioContainer: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  bioText: {
+    flex: 1,
     fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
+    fontStyle: 'italic',
+  },
+  editIcon: {
+    marginLeft: 8,
+  },
+  bioEditContainer: {
+    marginTop: 8,
+    width: '100%',
+  },
+  bioInput: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#333',
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  bioActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    justifyContent: 'flex-end',
+  },
+  bioCancel: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#E0E0E0',
+  },
+  bioCancelText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#666',
+  },
+  bioSave: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#8B1E1E',
+  },
+  bioSaveText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#FFF',
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   blockedAppsSection: {
     marginBottom: 20,

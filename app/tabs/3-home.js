@@ -1,14 +1,59 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ImageBackground } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { getCurrentUser, getProfile } from '../../utils/api';
+import { responsive } from '../../utils/responsive';
 
 export default function Home() {
   const router = useRouter();
+  const [username, setUsername] = useState('');
+  const [stats, setStats] = useState([
+    { value: '0', label: 'DAY STREAK' },
+    { value: '0', label: 'HOURS\nFOCUSED' },
+    { value: '-', label: 'MATE\nRANK' },
+  ]);
 
-  const stats = [
-    { value: '17', label: 'DAY STREAK' },
-    { value: '67', label: 'HOURS\nFOCUSED' },
-    { value: '#2', label: 'MATE\nRANK' },
-  ];
+  useEffect(() => {
+    (async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) return;
+
+        const fallbackName =
+          user.user_metadata?.display_name ||
+          (user.email ? user.email.split('@')[0] : null);
+
+        // Immediately use a fallback so we never stay on plain 'User'
+        if (fallbackName) {
+          setUsername(fallbackName);
+        }
+
+        try {
+          const profile = await getProfile(user.id);
+          if (profile) {
+            if (profile.display_name) {
+              setUsername(profile.display_name);
+            }
+            
+            // Update stats from profile
+            const hours = Math.floor((profile.total_focus_minutes || 0) / 60);
+            const streak = profile.current_streak_days || 0;
+            const rank = profile.mate_rank > 0 ? `#${profile.mate_rank}` : '-';
+            
+            setStats([
+              { value: streak.toString(), label: 'DAY STREAK' },
+              { value: hours.toString(), label: 'HOURS\nFOCUSED' },
+              { value: rank, label: 'MATE\nRANK' },
+            ]);
+          }
+        } catch (inner) {
+          // Ignore profile errors; fallback name is already set
+        }
+      } catch (e) {
+        // Keep defaults
+      }
+    })();
+  }, []);
 
   const blockedApps = [
     { name: 'Instagram', preventions: 'x5 preventions' },
@@ -21,6 +66,7 @@ export default function Home() {
     { name: 'Austin Konig', status: 'Offline', color: '#D3D3D3' },
   ];
 
+
   return (
     <View style={styles.container}>
       <ImageBackground
@@ -31,7 +77,9 @@ export default function Home() {
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.welcomeText}>Welcome, Hannah!</Text>
+          <Text style={styles.welcomeText}>
+            {username ? `Welcome, ${username}!` : 'Welcome!'}
+          </Text>
           
           <View style={styles.statsContainer}>
             {stats.map((stat, index) => (
@@ -78,7 +126,6 @@ export default function Home() {
               <TouchableOpacity 
                 key={index} 
                 style={styles.blockedAppCard}
-                onPress={() => router.push('/blocked-apps')}
               >
                 <Text style={styles.blockedAppName}>{app.name}</Text>
                 <View style={styles.preventionRow}>
@@ -139,74 +186,78 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
     paddingTop: 60,
+    width: '100%',
+    maxWidth: responsive.maxWidth,
   },
   header: {
-    paddingHorizontal: 20,
-    marginBottom: 10,
+    paddingHorizontal: responsive.contentPadding,
+    marginBottom: responsive.padding.sm,
   },
   welcomeText: {
-    fontSize: 32,
+    fontSize: responsive.fontSize.xxxl,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
-    marginBottom: 20,
+    marginBottom: responsive.padding.md,
   },
   statsContainer: {
-    alignItems: 'flex-end',
     position: 'absolute',
-    right: 20,
+    right: responsive.contentPadding * 0.00000001,
     top: 60,
+    width: responsive.isTablet ? 160 : 120,
+    alignItems: 'center',
   },
   statItem: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: responsive.padding.md,
   },
   statValue: {
-    fontSize: 48,
+    fontSize: responsive.fontSize.huge,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
-    lineHeight: 52,
+    lineHeight: responsive.fontSize.huge * 1.1,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
     textAlign: 'center',
-    lineHeight: 14,
+    lineHeight: responsive.fontSize.sm * 1.2,
   },
   cardsContainer: {
-    paddingHorizontal: 50,
-    gap: 16,
+    paddingHorizontal: responsive.isTablet ? responsive.contentPadding : 50,
+    gap: responsive.padding.md,
     alignItems: 'flex-start',
-    paddingLeft: 25,
+    paddingLeft: responsive.contentPadding,
   },
   cardWrapper: {
-    width: '82%',
+    width: responsive.isTablet ? '90%' : '82%',
   },
   actionCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 16,
+    borderRadius: responsive.isTablet ? 30 : 20,
+    padding: responsive.padding.lg,
+    marginBottom: responsive.padding.md,
     position: 'relative',
   },
   cardTitle: {
-    fontSize: 28,
+    fontSize: responsive.fontSize.xxl * 1.2,
     fontFamily: 'Poppins_700Bold',
     color: '#000000',
-    marginBottom: 4,
+    marginBottom: responsive.padding.xs,
   },
   cardSubtitle: {
-    fontSize: 16,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_400Regular',
     color: '#666666',
   },
   cardArrow: {
     position: 'absolute',
-    right: 24,
+    right: responsive.padding.lg,
     top: '50%',
     marginTop: -15,
   },
@@ -215,32 +266,33 @@ const styles = StyleSheet.create({
     color: '#666666',
   },
   blockedAppsSection: {
-    paddingHorizontal: 20,
-    marginTop: 8,
+    paddingHorizontal: responsive.contentPadding,
+    marginTop: responsive.padding.sm,
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: responsive.fontSize.xxl,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
-    marginBottom: 12,
+    marginBottom: responsive.padding.sm,
   },
   blockedAppsContainer: {
     flexDirection: 'row',
-    gap: 8,
+    gap: responsive.padding.sm,
+    flexWrap: 'wrap',
   },
   blockedAppCard: {
     backgroundColor: 'rgba(139, 69, 19, 0.6)',
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    padding: 16,
-    width: 140,
+    padding: responsive.padding.md,
+    width: responsive.isTablet ? 160 : 140,
   },
   blockedAppName: {
-    fontSize: 18,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
-    marginBottom: 24,
+    marginBottom: responsive.padding.lg,
   },
   preventionRow: {
     flexDirection: 'row',
@@ -248,7 +300,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   preventionText: {
-    fontSize: 12,
+    fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
   },
@@ -268,19 +320,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
   },
   motiMatesSection: {
-    paddingHorizontal: 20,
-    marginTop: 24,
+    paddingHorizontal: responsive.contentPadding,
+    marginTop: responsive.padding.lg,
   },
   motiMatesTitle: {
-    fontSize: 22,
+    fontSize: responsive.fontSize.xl,
     fontFamily: 'Poppins_700Bold',
     color: '#000000',
-    marginBottom: 16,
+    marginBottom: responsive.padding.md,
   },
   friendsContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: responsive.isTablet ? 30 : 20,
+    padding: responsive.padding.md,
   },
   friendsRow: {
     flexDirection: 'row',
@@ -297,15 +349,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#DDD',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: responsive.padding.sm,
   },
   friendInitial: {
-    fontSize: 24,
+    fontSize: responsive.fontSize.xxl,
     fontFamily: 'Poppins_700Bold',
     color: '#666',
   },
   friendName: {
-    fontSize: 12,
+    fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000000',
     textAlign: 'center',
@@ -318,7 +370,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   friendStatus: {
-    fontSize: 10,
+    fontSize: responsive.fontSize.xs,
     fontFamily: 'Poppins_400Regular',
     color: '#666666',
     textAlign: 'center',
@@ -336,7 +388,7 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: responsive.padding.sm,
   },
   findMatePlus: {
     fontSize: 32,
@@ -344,7 +396,7 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   findMateText: {
-    fontSize: 12,
+    fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000000',
     textAlign: 'center',

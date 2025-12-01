@@ -1,17 +1,33 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { signInWithEmail } from '../../utils/api';
+import { responsive } from '../../utils/responsive';
 
 export default function Login() {
   const router = useRouter();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     // Simulated login - navigate to home tab
-    if (username && password) {
+    if (!email || !password) {
+      setError('Please enter email and password.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      await signInWithEmail({ email, password });
       router.replace('/tabs/3-home');
+    } catch (e) {
+      setError(e.message || 'Unable to log in. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -21,6 +37,10 @@ export default function Login() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <View style={styles.container}>
         <LinearGradient
           colors={['#FFB84D', '#FF6B35', '#5D2E1F']}
@@ -35,13 +55,14 @@ export default function Login() {
             <Text style={styles.tagline}>Friends don't let friends doomscroll.</Text>
             
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>USERNAME</Text>
+              <Text style={styles.label}>EMAIL</Text>
               <TextInput
                 style={styles.input}
-                value={username}
-                onChangeText={setUsername}
+                value={email}
+                onChangeText={setEmail}
                 autoCapitalize="none"
                 autoCorrect={false}
+                keyboardType="email-address"
               />
             </View>
 
@@ -57,9 +78,11 @@ export default function Login() {
               />
             </View>
 
-            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-              <Text style={styles.loginButtonText}>Login</Text>
+            <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
+              <Text style={styles.loginButtonText}>{loading ? 'Logging in...' : 'Login'}</Text>
             </TouchableOpacity>
+
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>Don't have an account? </Text>
@@ -70,6 +93,7 @@ export default function Login() {
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
 }
@@ -89,58 +113,61 @@ const styles = StyleSheet.create({
   curvedContainer: {
     flex: 1,
     justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   formContainer: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    paddingTop: 50,
-    paddingHorizontal: 40,
-    paddingBottom: 60,
+    borderTopLeftRadius: responsive.isTablet ? 60 : 40,
+    borderTopRightRadius: responsive.isTablet ? 60 : 40,
+    paddingTop: responsive.padding.xl,
+    paddingHorizontal: responsive.contentPadding,
+    paddingBottom: responsive.padding.xl * 2,
     minHeight: '65%',
+    width: '100%',
+    maxWidth: responsive.maxWidth,
   },
   title: {
-    fontSize: 48,
+    fontSize: responsive.fontSize.huge,
     fontFamily: 'Poppins_700Bold',
     color: '#000000',
-    marginBottom: 8,
+    marginBottom: responsive.padding.sm,
   },
   tagline: {
-    fontSize: 16,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_400Regular',
     color: '#666666',
-    marginBottom: 40,
+    marginBottom: responsive.padding.xl,
   },
   inputContainer: {
-    marginBottom: 24,
+    marginBottom: responsive.padding.lg,
   },
   label: {
-    fontSize: 12,
+    fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000000',
-    marginBottom: 8,
+    marginBottom: responsive.padding.sm,
     letterSpacing: 0.5,
   },
   input: {
     backgroundColor: '#E0E0E0',
     borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    fontSize: 16,
+    paddingHorizontal: responsive.padding.md,
+    paddingVertical: responsive.padding.md,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_400Regular',
     color: '#000000',
   },
   loginButton: {
     backgroundColor: '#8B1E1E',
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: responsive.padding.md,
     alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 20,
+    marginTop: responsive.padding.md,
+    marginBottom: responsive.padding.md,
   },
   loginButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: responsive.fontSize.xl,
     fontFamily: 'Poppins_600SemiBold',
   },
   signupContainer: {
@@ -149,13 +176,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   signupText: {
-    fontSize: 14,
+    fontSize: responsive.fontSize.md,
     fontFamily: 'Poppins_400Regular',
     color: '#666666',
   },
   signupLink: {
-    fontSize: 14,
+    fontSize: responsive.fontSize.md,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
+  },
+  errorText: {
+    marginTop: responsive.padding.sm,
+    textAlign: 'center',
+    color: '#B71C1C',
+    fontSize: responsive.fontSize.sm,
+    fontFamily: 'Poppins_400Regular',
   },
 });

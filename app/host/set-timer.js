@@ -16,8 +16,8 @@ export default function SetTimer() {
 
   const validateTime = (value, fieldName) => {
     const num = parseInt(value) || 0;
-    if (num < 5 || num > 180) {
-      setErrorMessage(`${fieldName} must be between 5 and 180 minutes`);
+    if (num < 1 || num > 180) {
+      setErrorMessage(`${fieldName} must be between 1 and 180 minutes`);
       setShowError(true);
       setTimeout(() => setShowError(false), 2000);
       return false;

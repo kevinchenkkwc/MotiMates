@@ -1,18 +1,47 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { signUpWithEmail } from '../../utils/api';
 
 export default function Signup() {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     // Simulated signup - navigate to home tab
-    if (username && email && password) {
-      router.replace('/tabs/3-home');
+    if (!username || !email || !password) {
+      setError('Please fill in all fields.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      setInfo('');
+
+      const data = await signUpWithEmail({
+        email,
+        password,
+        displayName: username,
+      });
+
+      const hasSession = !!data?.session;
+      if (hasSession) {
+        router.replace('/tabs/3-home');
+      } else {
+        setInfo('Check your email to confirm your account, then log in.');
+        router.replace('/auth/login');
+      }
+    } catch (e) {
+      setError(e.message || 'Unable to sign up. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -22,6 +51,10 @@ export default function Signup() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <View style={styles.container}>
         <LinearGradient
           colors={['#FFB84D', '#FF6B35', '#5D2E1F']}
@@ -70,9 +103,12 @@ export default function Signup() {
               />
             </View>
 
-            <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
-              <Text style={styles.signupButtonText}>Sign Up</Text>
+            <TouchableOpacity style={styles.signupButton} onPress={handleSignup} disabled={loading}>
+              <Text style={styles.signupButtonText}>{loading ? 'Signing up...' : 'Sign Up'}</Text>
             </TouchableOpacity>
+
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {info ? <Text style={styles.infoText}>{info}</Text> : null}
 
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>Already have an account? </Text>
@@ -83,6 +119,7 @@ export default function Signup() {
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
 }
@@ -170,5 +207,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
+  },
+  errorText: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: '#B71C1C',
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+  },
+  infoText: {
+    marginTop: 4,
+    textAlign: 'center',
+    color: '#666666',
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
   },
 });

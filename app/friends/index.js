@@ -1,17 +1,14 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ImageBackground, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { responsive } from '../../utils/responsive';
 
-export default function Friends() {
+export default function FriendsScreen() {
   const router = useRouter();
 
   const friends = [
-    { id: 1, name: 'Derek Bao', status: 'online', emoji: '🟢' },
-    { id: 2, name: 'Kevin Chen', status: 'away', emoji: '🟡' },
-    { id: 3, name: 'Austin Konig', status: 'offline', emoji: '⚫' },
-    { id: 4, name: 'Charlotte Z', status: 'online', emoji: '🟢' },
-    { id: 5, name: 'Alan Cheng', status: 'away', emoji: '🟡' },
+    { name: 'Derek Bao', status: 'Online', color: '#90EE90' },
+    { name: 'Kevin Chen', status: 'In Session', color: '#FFD700' },
+    { name: 'Austin Konig', status: 'Offline', color: '#D3D3D3' },
   ];
 
   return (
@@ -21,81 +18,30 @@ export default function Friends() {
         style={styles.background}
         resizeMode="cover"
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={28} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Friends</Text>
-          <View style={{ width: 28 }} />
-        </View>
-
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>Your Mates</Text>
-
-          <View style={styles.leaderboardCard}>
-            <Text style={styles.leaderboardTitle}>Leaderboard</Text>
-            <View style={styles.leaderboardList}>
-              <View style={styles.leaderItem}>
-                <Text style={styles.rank}>1</Text>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>C</Text>
-                </View>
-                <Text style={styles.leaderName}>Charlotte Z</Text>
-              </View>
-              <View style={styles.leaderItem}>
-                <Text style={styles.rank}>2</Text>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>A</Text>
-                </View>
-                <Text style={styles.leaderName}>Alan Cheng</Text>
-              </View>
-              <View style={styles.leaderItem}>
-                <Text style={styles.rank}>3</Text>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>J</Text>
-                </View>
-                <Text style={styles.leaderName}>James L</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.searchContainer}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search Mate"
-              placeholderTextColor="#999"
-              returnKeyType="search"
-            />
-            <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-          </View>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.title}>Your MotiMates</Text>
+          <Text style={styles.subtitle}>Wizard-of-oz friends list for demo</Text>
 
           <View style={styles.friendsList}>
-            {friends.map((friend) => (
-              <TouchableOpacity key={friend.id} style={styles.friendItem}>
-                <View style={styles.friendLeft}>
-                  <View style={styles.friendAvatar}>
-                    <Text style={styles.friendAvatarText}>{friend.name.charAt(0)}</Text>
-                  </View>
+            {friends.map((friend, index) => (
+              <View key={index} style={styles.friendRow}>
+                <View style={[styles.avatar, { backgroundColor: '#DDD' }]}>
+                  <Text style={styles.avatarText}>{friend.name.charAt(0)}</Text>
+                </View>
+                <View style={styles.friendInfo}>
                   <Text style={styles.friendName}>{friend.name}</Text>
-                  <Text style={styles.statusEmoji}>{friend.emoji}</Text>
+                  <View style={styles.statusRow}>
+                    <View style={[styles.statusDot, { backgroundColor: friend.color }]} />
+                    <Text style={styles.friendStatus}>{friend.status}</Text>
+                  </View>
                 </View>
-                <View style={styles.friendActions}>
-                  <TouchableOpacity style={styles.iconButton}>
-                    <MaterialCommunityIcons name="message-text-outline" size={20} color="#000" />
-                  </TouchableOpacity>
-                  <Ionicons name="chevron-forward" size={20} color="#666" />
-                </View>
-              </TouchableOpacity>
+              </View>
             ))}
           </View>
 
-          <TouchableOpacity style={styles.inviteButton}>
-            <MaterialCommunityIcons name="account-plus-outline" size={20} color="#000" />
-            <Text style={styles.inviteText}>Invite Mates</Text>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>Back to Home</Text>
           </TouchableOpacity>
-
-          <View style={{ height: 120 }} />
         </ScrollView>
       </ImageBackground>
     </View>
@@ -111,157 +57,90 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
   },
-  backButton: {
-    width: 28,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins_700Bold',
-    color: '#FFFFFF',
-  },
-  content: {
+  scrollView: {
     flex: 1,
-    paddingHorizontal: 20,
+    width: '100%',
+    maxWidth: responsive.maxWidth,
+    paddingTop: 60,
+  },
+  scrollContent: {
+    paddingHorizontal: responsive.contentPadding,
+    paddingBottom: responsive.padding.xl,
   },
   title: {
-    fontSize: 32,
+    fontSize: responsive.fontSize.xxxl,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
-    marginBottom: 20,
+    marginBottom: responsive.padding.xs,
   },
-  leaderboardCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-  },
-  leaderboardTitle: {
-    fontSize: 18,
-    fontFamily: 'Poppins_700Bold',
-    color: '#000',
-    marginBottom: 16,
-  },
-  leaderboardList: {
-    gap: 12,
-  },
-  leaderItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  rank: {
-    fontSize: 16,
-    fontFamily: 'Poppins_700Bold',
-    color: '#000',
-    width: 24,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#DDD',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 16,
-    fontFamily: 'Poppins_700Bold',
-    color: '#666',
-  },
-  leaderName: {
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#000',
-  },
-  searchContainer: {
-    position: 'relative',
-    marginBottom: 20,
-  },
-  searchInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    paddingRight: 48,
-    fontSize: 14,
+  subtitle: {
+    fontSize: responsive.fontSize.md,
     fontFamily: 'Poppins_400Regular',
-    fontStyle: 'italic',
-    color: '#000',
-  },
-  searchIcon: {
-    position: 'absolute',
-    right: 16,
-    top: 14,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: responsive.padding.lg,
   },
   friendsList: {
-    gap: 12,
-    marginBottom: 20,
+    gap: responsive.padding.md,
+    marginBottom: responsive.padding.lg,
   },
-  friendItem: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  friendLeft: {
+  friendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: responsive.isTablet ? 24 : 16,
+    padding: responsive.padding.md,
   },
-  friendAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#DDD',
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: responsive.padding.md,
   },
-  friendAvatarText: {
-    fontSize: 16,
+  avatarText: {
+    fontSize: responsive.fontSize.xl,
     fontFamily: 'Poppins_700Bold',
     color: '#666',
   },
+  friendInfo: {
+    flex: 1,
+  },
   friendName: {
-    fontSize: 16,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
-    flex: 1,
+    marginBottom: 2,
   },
-  statusEmoji: {
-    fontSize: 12,
-  },
-  friendActions: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
-  iconButton: {
-    padding: 4,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
   },
-  inviteButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  friendStatus: {
+    fontSize: responsive.fontSize.sm,
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
   },
-  inviteText: {
-    fontSize: 16,
+  backButton: {
+    marginTop: responsive.padding.lg,
+    alignSelf: 'center',
+    paddingVertical: responsive.padding.sm,
+    paddingHorizontal: responsive.padding.lg,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.8)',
+  },
+  backButtonText: {
+    fontSize: responsive.fontSize.md,
     fontFamily: 'Poppins_600SemiBold',
-    color: '#000',
-    flex: 1,
+    color: '#FFFFFF',
   },
 });

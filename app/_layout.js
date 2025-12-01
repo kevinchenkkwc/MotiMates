@@ -41,9 +41,9 @@ export default function RootLayout() {
       <Stack.Screen name="tabs" />
       <Stack.Screen name="host" />
       <Stack.Screen name="session" />
-      <Stack.Screen name="friends" />
       <Stack.Screen name="profile" />
       <Stack.Screen name="blocked-apps" />
+      <Stack.Screen name="friends" />
     </Stack>
   );
 }

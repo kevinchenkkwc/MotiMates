@@ -1,8 +1,22 @@
 import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ScrollView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useRouter } from 'expo-router';
+import { signOut } from '../../utils/api';
 
 export default function Settings() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (e) {
+      // If sign-out fails, still navigate back to login so the user can retry.
+    } finally {
+      router.replace('/auth/login');
+    }
+  };
+
   const SettingItem = ({ icon, label, value, onPress }) => (
     <TouchableOpacity style={styles.settingItem} onPress={onPress}>
       <View style={styles.settingLeft}>
@@ -33,7 +47,11 @@ export default function Settings() {
               <SettingItem icon={<Ionicons name="lock-closed-outline" size={20} color="#000" />} label="Accounts Privacy" />
               <SettingItem icon={<Ionicons name="call-outline" size={20} color="#000" />} label="Phone" value="+XXXXXXXXXX" />
               <SettingItem icon={<Ionicons name="school-outline" size={20} color="#000" />} label="School" value="Stanford University" />
-              <SettingItem icon={<Ionicons name="log-out-outline" size={20} color="#000" />} label="Log Out" />
+              <SettingItem
+                icon={<Ionicons name="log-out-outline" size={20} color="#000" />}
+                label="Log Out"
+                onPress={handleLogout}
+              />
             </View>
           </View>
 

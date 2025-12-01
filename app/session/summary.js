@@ -1,15 +1,69 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, Modal, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, Modal, Keyboard, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getSession, getSessionParticipants, getFocusGoals, saveReflection, getCurrentUser } from '../../utils/api';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function SessionSummary() {
   const router = useRouter();
-  const { sessionName, totalMinutes, endedEarly, goals } = useLocalSearchParams();
+  const { sessionId, sessionName, totalMinutes, endedEarly } = useLocalSearchParams();
   const [productivity, setProductivity] = useState(0);
   const [reflection, setReflection] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null);
+  const [participantsWithGoals, setParticipantsWithGoals] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
-  const handleDone = () => {
+  useEffect(() => {
+    loadSummaryData();
+  }, []);
+
+  const loadSummaryData = async () => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        router.replace('/auth/login');
+        return;
+      }
+      setCurrentUserId(user.id);
+
+      const sessionData = await getSession(sessionId);
+      setSession(sessionData);
+
+      const participants = await getSessionParticipants(sessionId);
+      
+      // Load goals for each participant
+      const participantsWithGoalsData = await Promise.all(
+        participants.map(async (p) => {
+          const goals = await getFocusGoals(sessionId, p.user_id);
+          return {
+            ...p,
+            goals,
+            completed: goals.filter(g => g.is_completed).length,
+            total: goals.length,
+          };
+        })
+      );
+
+      setParticipantsWithGoals(participantsWithGoalsData);
+    } catch (e) {
+      console.error('Failed to load summary:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDone = async () => {
+    // Save reflection if provided
+    if (reflection.trim() && sessionId) {
+      try {
+        await saveReflection(sessionId, reflection.trim());
+      } catch (e) {
+        console.error('Failed to save reflection:', e);
+      }
+    }
+
     setShowConfirm(true);
     setTimeout(() => {
       setShowConfirm(false);
@@ -26,21 +80,25 @@ export default function SessionSummary() {
 
   const early = endedEarly === 'true';
 
-  let goalsList = [];
-  let rawGoals = goals;
+  const totalGoalsCompleted = participantsWithGoals.reduce((sum, p) => sum + p.completed, 0);
+  const totalGoals = participantsWithGoals.reduce((sum, p) => sum + p.total, 0);
+  const successRate = totalGoals > 0 ? Math.round((totalGoalsCompleted / totalGoals) * 100) : 0;
 
-  if (goals) {
-    try {
-      const decoded = decodeURIComponent(goals);
-      const parsed = JSON.parse(decoded);
-      if (Array.isArray(parsed)) {
-        goalsList = parsed;
-      } else {
-        rawGoals = decoded;
-      }
-    } catch (e) {
-      rawGoals = goals;
-    }
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ImageBackground
+          source={require('../../assets/background.png')}
+          style={styles.background}
+          resizeMode="cover"
+        >
+          <View style={styles.centerContent}>
+            <ActivityIndicator size="large" color="#FFF" />
+            <Text style={styles.loadingText}>Loading summary...</Text>
+          </View>
+        </ImageBackground>
+      </View>
+    );
   }
 
   return (
@@ -50,53 +108,68 @@ export default function SessionSummary() {
         style={styles.background}
         resizeMode="cover"
       >
-        <View style={styles.content}>
-          <Text style={styles.title}>{early ? 'Request Approved' : 'End Summary'}</Text>
+        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.title}>{early ? 'Session Ended' : '🎉 Session Complete!'}</Text>
+
+          <View style={styles.statsCard}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{durationText}</Text>
+              <Text style={styles.statLabel}>Focused</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{totalGoalsCompleted}/{totalGoals}</Text>
+              <Text style={styles.statLabel}>Goals Done</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{successRate}%</Text>
+              <Text style={styles.statLabel}>Success</Text>
+            </View>
+          </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>
-              {early ? `Session ended early${sessionName ? '' : ''}` : 'Congratulations!'}
-            </Text>
-            <Text style={styles.cardSubtitle}>
-              {early
-                ? `You've logged ${durationText} of co-focus time.`
-                : "You've just completed a co-focus session!"}
-            </Text>
-
-            {goalsList.length > 0 ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Focus Goals</Text>
-                {goalsList.map((goal) => (
-                  <Text
-                    key={goal.id}
-                    style={[
-                      styles.goalsText,
-                      goal.completed && styles.goalsTextCompleted,
-                    ]}
-                  >
-                    {goal.completed ? '✓ ' : '• '}
-                    {goal.text}
-                  </Text>
-                ))}
-              </View>
-            ) : rawGoals ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Focus Goals</Text>
-                <Text style={styles.goalsText}>{rawGoals}</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Focus Partners</Text>
-              <View style={styles.partnersRow}>
-                <View style={styles.partnerAvatar}>
-                  <Text style={styles.partnerAvatarText}>K</Text>
+            <Text style={styles.cardTitle}>Team Progress</Text>
+            
+            {participantsWithGoals.map((participant) => (
+              <View key={participant.user_id} style={styles.participantSection}>
+                <View style={styles.participantHeader}>
+                  <View style={styles.participantAvatar}>
+                    <Text style={styles.participantAvatarText}>
+                      {(participant.profiles?.display_name || 'U').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.participantInfo}>
+                    <Text style={styles.participantName}>
+                      {participant.profiles?.display_name || 'User'}
+                      {participant.user_id === currentUserId && ' (You)'}
+                    </Text>
+                    <Text style={styles.participantStats}>
+                      {participant.completed}/{participant.total} goals completed
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.partnerAvatar}>
-                  <Text style={styles.partnerAvatarText}>D</Text>
-                </View>
+                {participant.goals.length > 0 && (
+                  <View style={styles.goalsContainer}>
+                    {participant.goals.map((goal) => (
+                      <View key={goal.id} style={styles.goalRow}>
+                        <Ionicons
+                          name={goal.is_completed ? 'checkmark-circle' : 'ellipse-outline'}
+                          size={16}
+                          color={goal.is_completed ? '#4CAF50' : '#999'}
+                        />
+                        <Text style={[
+                          styles.goalText,
+                          goal.is_completed && styles.goalTextCompleted
+                        ]}>
+                          {goal.goal_text}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
-            </View>
+            ))}
 
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Duration: {durationText}</Text>
@@ -135,9 +208,9 @@ export default function SessionSummary() {
           </View>
 
           <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
-            <Text style={styles.doneButtonText}>Done</Text>
+            <Text style={styles.doneButtonText}>Back to Home</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
 
         <Modal
           transparent
@@ -274,11 +347,114 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+    marginBottom: 20,
   },
   doneButtonText: {
     fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontFamily: 'Poppins_400Regular',
+    color: '#FFF',
+  },
+  scrollContent: {
+    paddingHorizontal: 30,
+    paddingTop: 64,
+    paddingBottom: 32,
+  },
+  statsCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontFamily: 'Poppins_700Bold',
+    color: '#8B1E1E',
+  },
+  statLabel: {
+    fontSize: 11,
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    marginTop: 4,
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#DDD',
+  },
+  participantSection: {
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+  },
+  participantHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  participantAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#8B1E1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  participantAvatarText: {
+    fontSize: 18,
+    fontFamily: 'Poppins_700Bold',
+    color: '#FFF',
+  },
+  participantInfo: {
+    flex: 1,
+  },
+  participantName: {
+    fontSize: 16,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#000',
+  },
+  participantStats: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    marginTop: 2,
+  },
+  goalsContainer: {
+    marginLeft: 52,
+    gap: 8,
+  },
+  goalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  goalText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#333',
+    flex: 1,
+  },
+  goalTextCompleted: {
+    textDecorationLine: 'line-through',
+    color: '#999',
   },
   modalOverlay: {
     flex: 1,

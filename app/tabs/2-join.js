@@ -1,56 +1,128 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView, TextInput, Modal, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useState, useEffect, useRef } from 'react';
+import { listPublicActiveSessions, getSessionByInviteCode, joinSessionById } from '../../utils/api';
+import { supabase } from '../../utils/supabase';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { responsive } from '../../utils/responsive';
 
 export default function Join() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [sessions, setSessions] = useState([]);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [codeError, setCodeError] = useState('');
+  const [joiningCode, setJoiningCode] = useState(false);
 
-  const activeSessions = [
-    {
-      id: 1,
-      name: 'Room #1: WE\'RE LOCKED IN',
-      timeLeft: '1h 32min',
-      host: 'Kevin Chen',
-      participants: ['K', 'D', 'A', '+2']
-    },
-    {
-      id: 2,
-      name: 'Room #2: At the Trenches',
-      timeLeft: '45min',
-      host: 'Charlotte Zhu',
-      participants: ['C', 'A']
-    },
-    {
-      id: 3,
-      name: 'Study #5 in the Trenches',
-      timeLeft: '2h 15min',
-      host: 'Derek Bao',
-      participants: ['D', 'J', 'S', '+1']
-    }
-  ];
+  useEffect(() => {
+    loadActiveSessions();
 
-  const handleJoinSession = (sessionId) => {
-    const session = activeSessions.find(s => s.id === sessionId);
-    if (session) {
-      // Convert time string to minutes (e.g., "1h 32min" -> 92)
-      const timeMatch = session.timeLeft.match(/(\d+)h\s*(\d+)min/);
-      let totalMinutes = 0;
-      if (timeMatch) {
-        totalMinutes = parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
-      } else {
-        const minMatch = session.timeLeft.match(/(\d+)min/);
-        if (minMatch) {
-          totalMinutes = parseInt(minMatch[1]);
+    // Set up broadcast channel for session updates
+    const channel = supabase
+      .channel('public-sessions-broadcast')
+      .on('broadcast', { event: 'session_created' }, (payload) => {
+        console.log('[Join] Session created:', payload);
+        loadActiveSessions();
+      })
+      .on('broadcast', { event: 'session_updated' }, (payload) => {
+        console.log('[Join] Session updated:', payload);
+        loadActiveSessions();
+      })
+      .subscribe();
+
+    // Poll every 10 seconds as fallback
+    const interval = setInterval(() => {
+      loadActiveSessions();
+    }, 10000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const loadActiveSessions = async () => {
+    try {
+      const data = await listPublicActiveSessions();
+
+      // Filter out sessions that have no time left (e.g. show 0 min left)
+      const now = Date.now();
+      const filtered = (data || []).filter((session) => {
+        if (session.status === 'in_progress' && session.started_at) {
+          const elapsedMs = now - new Date(session.started_at).getTime();
+          const totalMs = (session.work_minutes || 60) * 60 * 1000;
+          const remainingMinutes = Math.floor((totalMs - elapsedMs) / 1000 / 60);
+          return remainingMinutes > 0;
         }
-      }
-      
-      router.push({ 
-        pathname: '/session/goals', 
-        params: { 
-          sessionName: session.name,
-          totalMinutes: totalMinutes.toString(),
-        } 
+        // For 'active' (not yet started) sessions, always show
+        return true;
       });
+
+      setSessions(filtered);
+    } catch (e) {
+      console.error('Failed to load sessions:', e);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleSessionTap = (session) => {
+    router.push({
+      pathname: '/session/room-details',
+      params: { sessionId: session.id },
+    });
+  };
+
+  const handleJoinByCode = async () => {
+    if (!inviteCode.trim()) {
+      setCodeError('Please enter an invite code');
+      return;
+    }
+
+    try {
+      setJoiningCode(true);
+      setCodeError('');
+
+      const session = await getSessionByInviteCode(inviteCode.trim().toUpperCase());
+      if (!session) {
+        setCodeError('Session not found. Check the code and try again.');
+        return;
+      }
+
+      if (session.status === 'ended') {
+        setCodeError('This session has ended.');
+        return;
+      }
+
+      setShowCodeModal(false);
+      setInviteCode('');
+      
+      // Navigate to room details
+      router.push({
+        pathname: '/session/room-details',
+        params: { sessionId: session.id },
+      });
+    } catch (e) {
+      setCodeError(e.message || 'Unable to join session');
+    } finally {
+      setJoiningCode(false);
+    }
+  };
+
+  const formatTimeLeft = (session) => {
+    if (session.status === 'in_progress' && session.started_at) {
+      const elapsed = Date.now() - new Date(session.started_at).getTime();
+      const totalMs = (session.work_minutes || 60) * 60 * 1000;
+      const remaining = Math.max(0, Math.floor((totalMs - elapsed) / 1000 / 60));
+      const h = Math.floor(remaining / 60);
+      const m = remaining % 60;
+      return h > 0 ? `${h}h ${m}min left` : `${m}min left`;
+    }
+    const mins = session.work_minutes || 60;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}min` : `${m}min`;
   };
 
   return (
@@ -62,54 +134,124 @@ export default function Join() {
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Active Sessions</Text>
+          <TouchableOpacity style={styles.codeButtonHeader} onPress={() => setShowCodeModal(true)}>
+            <Text style={styles.codeButtonText}>Enter Invite Code</Text>
+          </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={styles.subtitle}>Join an active session!</Text>
+        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.sectionTitle}>Join an Active Session!</Text>
 
-          {activeSessions.map((session) => (
-            <View key={session.id} style={styles.sessionCard}>
-              <Text style={styles.sessionName}>{session.name}</Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FFF" />
+            </View>
+          ) : sessions.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>no active sessions ☹️</Text>
+            </View>
+          ) : (
+            sessions.map((session) => {
+              const host = session.profiles;
+              const participants = session.session_participants || [];
               
-              <View style={styles.sessionInfo}>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Time Left: </Text>
-                  <Text style={styles.value}>{session.timeLeft}</Text>
-                </View>
-                
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Hosted by</Text>
-                </View>
-                <View style={styles.hostRow}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{session.host.charAt(0)}</Text>
+              return (
+                <TouchableOpacity
+                  key={session.id}
+                  style={styles.sessionCard}
+                  onPress={() => handleSessionTap(session)}
+                >
+                  <View style={styles.sessionHeader}>
+                    <Text style={styles.sessionName} numberOfLines={1}>
+                      Room #{session.invite_code}: {session.name || 'Untitled'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={20} color="#000" />
                   </View>
-                  <Text style={styles.hostName}>{session.host}</Text>
-                </View>
 
-                <View style={styles.participantsRow}>
-                  <Text style={styles.label}>JOIN IN NOW!*</Text>
-                  <View style={styles.participantAvatars}>
-                    {session.participants.map((p, idx) => (
-                      <View key={idx} style={styles.smallAvatar}>
-                        <Text style={styles.smallAvatarText}>{p}</Text>
+                  <View style={styles.sessionMeta}>
+                    <View style={styles.hostSection}>
+                      <Text style={styles.hostLabel}>Host</Text>
+                      <View style={styles.hostRow}>
+                        <View style={styles.smallAvatar}>
+                          <Text style={styles.smallAvatarText}>
+                            {(host?.display_name || 'H').charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        {participants.slice(0, 2).filter(p => p.user_id !== session.host_id).map((p, idx) => (
+                          <View key={idx} style={[styles.smallAvatar, { marginLeft: -8 }]}>
+                            <Text style={styles.smallAvatarText}>
+                              {(p.profiles?.display_name || 'U').charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        ))}
                       </View>
-                    ))}
-                  </View>
-                </View>
-              </View>
+                    </View>
 
-              <TouchableOpacity 
-                style={styles.joinButton}
-                onPress={() => handleJoinSession(session.id)}
+                    <Text style={styles.timeLeft}>{formatTimeLeft(session)}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+
+        <Modal
+          transparent
+          visible={showCodeModal}
+          animationType="slide"
+          onRequestClose={() => setShowCodeModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => {
+                  setShowCodeModal(false);
+                  setInviteCode('');
+                  setCodeError('');
+                }}
               >
-                <Text style={styles.joinButtonText}>Join Session</Text>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+
+              <Ionicons name="enter-outline" size={48} color="#8B1E1E" style={styles.modalIcon} />
+              <Text style={styles.modalTitle}>Enter Invite Code</Text>
+              <Text style={styles.modalSubtitle}>Ask your mate for their session code</Text>
+
+              <TextInput
+                style={styles.codeInput}
+                value={inviteCode}
+                onChangeText={(text) => {
+                  setInviteCode(text.toUpperCase());
+                  setCodeError('');
+                }}
+                placeholder="ABC123"
+                placeholderTextColor="#999"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={8}
+                returnKeyType="join"
+                onSubmitEditing={handleJoinByCode}
+              />
+
+              {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
+
+              <TouchableOpacity
+                style={[styles.joinButton, joiningCode && styles.joinButtonDisabled]}
+                onPress={handleJoinByCode}
+                disabled={joiningCode}
+              >
+                {joiningCode ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.joinButtonText}>Join Session</Text>
+                )}
               </TouchableOpacity>
             </View>
-          ))}
-
-          <View style={{ height: 120 }} />
-        </ScrollView>
+          </View>
+        </Modal>
       </ImageBackground>
     </View>
   );
@@ -126,108 +268,184 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: responsive.contentPadding,
     paddingTop: 60,
     paddingBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: responsive.fontSize.xxl,
     fontFamily: 'Poppins_700Bold',
+    color: '#FFFFFF',
+  },
+  codeButtonHeader: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  codeButtonText: {
+    fontSize: responsive.fontSize.sm,
+    fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
   },
-  subtitle: {
-    fontSize: 16,
-    fontFamily: 'Poppins_400Regular',
+  scrollContent: {
+    paddingHorizontal: responsive.contentPadding,
+    paddingBottom: 40,
+  },
+  sectionTitle: {
+    fontSize: responsive.fontSize.xl,
+    fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: 20,
   },
-  sessionCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+  loadingContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
   },
-  sessionName: {
-    fontSize: 18,
-    fontFamily: 'Poppins_700Bold',
-    color: '#000',
+  emptyContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: responsive.fontSize.xl,
+    fontFamily: 'Poppins_400Regular',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  sessionCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 16,
+    padding: responsive.padding.md,
     marginBottom: 12,
   },
-  sessionInfo: {
-    marginBottom: 16,
+  sessionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  infoRow: {
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    color: '#666',
-  },
-  value: {
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
+  sessionName: {
+    flex: 1,
+    fontSize: responsive.fontSize.lg,
+    fontFamily: 'Poppins_700Bold',
     color: '#000',
+    marginRight: 8,
+  },
+  sessionMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  hostSection: {
+    flex: 1,
+  },
+  hostLabel: {
+    fontSize: responsive.fontSize.sm,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#666',
+    marginBottom: 4,
   },
   hostRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
   },
-  avatar: {
+  smallAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
     backgroundColor: '#DDD',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 14,
-    fontFamily: 'Poppins_700Bold',
-    color: '#666',
-  },
-  hostName: {
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#000',
-  },
-  participantsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  participantAvatars: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  smallAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#DDD',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
   },
   smallAvatarText: {
-    fontSize: 10,
+    fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_700Bold',
     color: '#666',
+  },
+  timeLeft: {
+    fontSize: responsive.fontSize.sm,
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 4,
+  },
+  modalIcon: {
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: responsive.fontSize.xxl,
+    fontFamily: 'Poppins_700Bold',
+    color: '#000',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  codeInput: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    fontSize: 24,
+    fontFamily: 'Poppins_700Bold',
+    color: '#8B1E1E',
+    textAlign: 'center',
+    letterSpacing: 4,
+    width: '100%',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+  },
+  errorText: {
+    color: '#B71C1C',
+    fontSize: responsive.fontSize.sm,
+    fontFamily: 'Poppins_400Regular',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   joinButton: {
     backgroundColor: '#8B1E1E',
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
+    width: '100%',
+  },
+  joinButtonDisabled: {
+    opacity: 0.6,
   },
   joinButtonText: {
-    fontSize: 16,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
   },
