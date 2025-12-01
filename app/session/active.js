@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView, Modal, TextInput, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { getSessionParticipants, getFocusGoals, getCurrentUser, endSession, createUnlockRequest, voteOnUnlockRequest, getPendingUnlockRequests } from '../../utils/api';
 import { supabase } from '../../utils/supabase';
+import { Audio } from 'expo-av';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { responsive } from '../../utils/responsive';
 
@@ -34,6 +35,8 @@ export default function ActiveSession() {
   const [pendingRequest, setPendingRequest] = useState(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [incomingRequest, setIncomingRequest] = useState(null);
+  const [sound, setSound] = useState(null);
+  const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
     loadSessionData();
@@ -173,9 +176,60 @@ export default function ActiveSession() {
     return () => clearInterval(interval);
   }, []);
 
+  // Load and play focus music
+  useEffect(() => {
+    let audioObject = null;
+
+    const loadSound = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+        });
+
+        const { sound: loadedSound } = await Audio.Sound.createAsync(
+          require('../../assets/audio/focus.mp3'),
+          { isLooping: true, volume: isMuted ? 0 : 0.5 },
+          null,
+          true
+        );
+        
+        audioObject = loadedSound;
+        setSound(loadedSound);
+        await loadedSound.playAsync();
+      } catch (error) {
+        console.error('Failed to load audio:', error);
+      }
+    };
+
+    loadSound();
+
+    return () => {
+      if (audioObject) {
+        audioObject.unloadAsync();
+      }
+    };
+  }, []);
+
+  // Update volume when mute changes
+  useEffect(() => {
+    if (sound) {
+      sound.setVolumeAsync(isMuted ? 0 : 0.5);
+    }
+  }, [isMuted, sound]);
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+  };
+
   const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -331,13 +385,16 @@ export default function ActiveSession() {
 
   let currentPhaseLabel = null;
   let nextPhaseLabel = null;
+  let segments = [];
+  let currentIndex = 0;
+  let segmentTimeLeftSeconds = null;
 
   if (pomodoroOn && pomodoro && shortBreak && longBreak) {
     const focusMin = parseInt(pomodoro) || 25;
     const shortMin = parseInt(shortBreak) || 5;
     const longMin = parseInt(longBreak) || 15;
 
-    const segments = [
+    segments = [
       { type: 'focus', duration: focusMin * 60 },
       { type: 'short_break', duration: shortMin * 60 },
       { type: 'focus', duration: focusMin * 60 },
@@ -353,7 +410,7 @@ export default function ActiveSession() {
     const elapsed = Math.max(0, Math.min(totalScheduleSeconds - 1, elapsedRaw));
 
     let remaining = elapsed;
-    let currentIndex = 0;
+    currentIndex = 0;
 
     for (let i = 0; i < segments.length; i++) {
       if (remaining < segments[i].duration) {
@@ -366,6 +423,10 @@ export default function ActiveSession() {
 
     const current = segments[currentIndex];
     const next = segments[currentIndex + 1];
+
+    // Time remaining in the current focus/break block
+    const elapsedInCurrentSegment = remaining;
+    segmentTimeLeftSeconds = Math.max(current.duration - elapsedInCurrentSegment, 0);
 
     const phaseText = (type) => {
       if (type === 'focus') return 'Study time!';
@@ -385,6 +446,25 @@ export default function ActiveSession() {
     } else {
       nextPhaseLabel = 'Session complete';
     }
+  }
+
+  // Compute a single motivational message so only one shows at a time
+  let motivation = null;
+  const showEndMotivation = timeLeft < 300 && timeLeft > 0;
+  const showStartMotivation = timeLeft > totalDuration * 0.8;
+
+  if (showEndMotivation) {
+    motivation = {
+      icon: 'flame',
+      color: '#FF6B35',
+      text: "Final push! You've got this! 💪",
+    };
+  } else if (showStartMotivation) {
+    motivation = {
+      icon: 'rocket',
+      color: '#4ECDC4',
+      text: 'Strong start! Keep the momentum! 🚀',
+    };
   }
 
   if (loading) {
@@ -411,30 +491,77 @@ export default function ActiveSession() {
         style={styles.background}
         resizeMode="cover"
       >
-        <View style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+        >
           {exitDeclined === 'true' && (
             <View style={styles.bannerDeclined}>
               <Text style={styles.bannerText}>Request declined by host. Lock in!</Text>
             </View>
           )}
           <View style={styles.sessionHeader}>
-            <Text style={styles.title}>In Session</Text>
+            <View style={styles.headerLeft}>
+              <Text style={styles.title}>In Session</Text>
+              {pomodoroOn && segments.length > 0 && (
+                <View style={styles.compactProgressRow}>
+                  <Text style={styles.compactProgressLabel}>
+                    Block {currentIndex + 1}/{segments.length}
+                  </Text>
+                  <View style={styles.compactDotsRow}>
+                    {segments.map((_, idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.compactDot,
+                          idx === currentIndex && styles.compactDotActive,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )}
+              {pomodoroOn && nextPhaseLabel && (
+                <Text style={styles.compactNextText}>
+                  {nextPhaseLabel === 'Session complete'
+                    ? nextPhaseLabel
+                    : `Next up: ${nextPhaseLabel}`}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity onPress={toggleMute} style={styles.muteButton}>
+              <Ionicons 
+                name={isMuted ? 'volume-mute' : 'volume-high'} 
+                size={28} 
+                color="#FFF" 
+              />
+            </TouchableOpacity>
           </View>
           <Text style={styles.subtitle}>{sessionName || "WE'RE LOCKED IN"}</Text>
 
           <Text style={styles.timerLabel}>Time remaining</Text>
-          <View style={styles.timerCircle}>
-            <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
+          <View style={styles.timerContainer}>
+            <View style={styles.progressRing} />
+            <View style={styles.timerCircle}>
+              <Text style={styles.timerText}>
+                {formatTime(pomodoroOn && segmentTimeLeftSeconds != null ? segmentTimeLeftSeconds : timeLeft)}
+              </Text>
+              {pomodoroOn && (
+                <Text style={styles.timerTotalLabel}>
+                  Total: {formatTime(timeLeft)} left
+                </Text>
+              )}
+              {pomodoroOn && currentPhaseLabel && (
+                <Text style={styles.timerPhase}>{currentPhaseLabel}</Text>
+              )}
+              <View style={styles.timerStats}>
+                <Ionicons name="people" size={14} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.timerStatsText}>{participants.length}</Text>
+              </View>
+            </View>
           </View>
 
-          {pomodoroOn && currentPhaseLabel && (
-            <View style={styles.phaseBlock}>
-              <Text style={styles.phaseCurrent}>{currentPhaseLabel}</Text>
-              {nextPhaseLabel ? (
-                <Text style={styles.phaseNext}>Next up: {nextPhaseLabel}</Text>
-              ) : null}
-            </View>
-          )}
+          
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Focus Goals</Text>
@@ -471,18 +598,29 @@ export default function ActiveSession() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Participants</Text>
+            <Text style={styles.sectionTitle}>🔥 Study Buddies ({participants.length})</Text>
             <View style={styles.participantsRow}>
               {participantsList.map((p, index) => (
                 <View key={`${p.name}-${index}`} style={styles.participant}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{p.avatar}</Text>
+                  <View style={styles.avatarContainer}>
+                    <View style={[styles.avatar, styles.avatarActive]}>
+                      <Text style={styles.avatarText}>{p.avatar}</Text>
+                    </View>
+                    <View style={styles.statusDot} />
                   </View>
-                  <Text style={styles.participantName}>{p.name}</Text>
+                  <Text style={styles.participantName} numberOfLines={1}>{p.name}</Text>
                 </View>
               ))}
             </View>
           </View>
+
+          {/* Motivational message (at most one at a time) */}
+          {motivation && (
+            <View style={styles.motivationBanner}>
+              <Ionicons name={motivation.icon} size={20} color={motivation.color} />
+              <Text style={styles.motivationText}>{motivation.text}</Text>
+            </View>
+          )}
 
           <TouchableOpacity 
             style={[styles.exitButton, pendingRequest && styles.exitButtonPending]} 
@@ -494,8 +632,7 @@ export default function ActiveSession() {
               {pendingRequest ? 'Request Pending...' : 'Request Unlock'}
             </Text>
           </TouchableOpacity>
-
-        </View>
+        </ScrollView>
       </ImageBackground>
 
       {/* Unlock Request Modal */}
@@ -596,6 +733,9 @@ const styles = StyleSheet.create({
     paddingTop: 80,
     paddingBottom: 40,
   },
+  scrollContent: {
+    paddingBottom: 40,
+  },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
@@ -622,7 +762,16 @@ const styles = StyleSheet.create({
   sessionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  headerLeft: {
+    flexShrink: 1,
+  },
+  muteButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   title: {
     fontSize: 14,
@@ -651,29 +800,111 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: 16,
   },
+  compactProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+    gap: 8,
+  },
+  compactProgressLabel: {
+    fontSize: 11,
+    fontFamily: 'Poppins_600SemiBold',
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  compactDotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  compactDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  compactDotActive: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFD700',
+  },
+  compactNextText: {
+    fontSize: 11,
+    fontFamily: 'Poppins_400Regular',
+    color: 'rgba(255, 255, 255, 0.75)',
+    marginTop: 2,
+  },
   timerLabel: {
     fontSize: 14,
     fontFamily: 'Poppins_600SemiBold',
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  timerContainer: {
+    alignSelf: 'center',
+    marginBottom: 16,
+    position: 'relative',
+  },
+  progressRing: {
+    position: 'absolute',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    borderWidth: 12,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    top: -10,
+    left: -10,
   },
   timerCircle: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
     backgroundColor: 'rgba(139, 69, 19, 0.7)',
-    borderWidth: 8,
+    borderWidth: 10,
     borderColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   timerText: {
-    fontSize: 48,
+    fontSize: 44,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  timerTotalLabel: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 2,
+  },
+  timerPhase: {
+    fontSize: 13,
+    fontFamily: 'Poppins_600SemiBold',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 6,
+    letterSpacing: 0.5,
+  },
+  timerStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 4,
+  },
+  timerStatsText: {
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   phaseBlock: {
     alignItems: 'center',
@@ -724,29 +955,58 @@ const styles = StyleSheet.create({
   },
   participantsRow: {
     flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
     gap: 16,
   },
   participant: {
     alignItems: 'center',
+    maxWidth: 70,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 6,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#DDD',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  avatarActive: {
+    backgroundColor: 'rgba(139, 30, 30, 0.8)',
+    borderColor: '#FFD700',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 6,
   },
   avatarText: {
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: 'Poppins_700Bold',
-    color: '#666',
+    color: '#FFF',
+  },
+  statusDot: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#FFF',
   },
   participantName: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Poppins_600SemiBold',
-    color: '#FFFFFF',
+    color: '#FFF',
+    textAlign: 'center',
   },
   readyOverlay: {
     position: 'absolute',
@@ -912,5 +1172,118 @@ const styles = StyleSheet.create({
     fontSize: responsive.fontSize.md,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFF',
+  },
+  pomodoroTimeline: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  timelineTitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  timelineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  timelineSegment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timelineBlock: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#CCC',
+  },
+  timelineBlockFocus: {
+    backgroundColor: '#8B1E1E',
+    borderColor: '#6B1515',
+  },
+  timelineBlockShortBreak: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#388E3C',
+  },
+  timelineBlockLongBreak: {
+    backgroundColor: '#2196F3',
+    borderColor: '#1976D2',
+  },
+  timelineBlockActive: {
+    transform: [{ scale: 1.15 }],
+    borderWidth: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  timelineBlockPast: {
+    opacity: 0.7,
+  },
+  timelineConnector: {
+    width: 8,
+    height: 2,
+    backgroundColor: '#CCC',
+    marginHorizontal: 2,
+  },
+  timelineConnectorPast: {
+    backgroundColor: '#888',
+  },
+  timelineLegend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    flexWrap: 'wrap',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    fontSize: 11,
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+  },
+  motivationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  motivationText: {
+    fontSize: 13,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#333',
+    flex: 1,
   },
 });

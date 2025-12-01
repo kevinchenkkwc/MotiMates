@@ -111,17 +111,28 @@ export default function Join() {
   };
 
   const formatTimeLeft = (session) => {
+    // Compute total scheduled minutes based on mode
+    let totalMinutes;
+    if (session.mode === 'pomodoro') {
+      const work = session.work_minutes || 25;
+      const shortBreak = session.short_break_minutes || 5;
+      const longBreak = session.long_break_minutes || 15;
+      totalMinutes = work * 4 + shortBreak * 3 + longBreak;
+    } else {
+      totalMinutes = session.work_minutes || 60;
+    }
+
     if (session.status === 'in_progress' && session.started_at) {
-      const elapsed = Date.now() - new Date(session.started_at).getTime();
-      const totalMs = (session.work_minutes || 60) * 60 * 1000;
-      const remaining = Math.max(0, Math.floor((totalMs - elapsed) / 1000 / 60));
+      const elapsedMs = Date.now() - new Date(session.started_at).getTime();
+      const totalMs = totalMinutes * 60 * 1000;
+      const remaining = Math.max(0, Math.floor((totalMs - elapsedMs) / 1000 / 60));
       const h = Math.floor(remaining / 60);
       const m = remaining % 60;
       return h > 0 ? `${h}h ${m}min left` : `${m}min left`;
     }
-    const mins = session.work_minutes || 60;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
+
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
     return h > 0 ? `${h}h ${m}min` : `${m}min`;
   };
 
