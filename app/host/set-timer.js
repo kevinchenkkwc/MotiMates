@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, Keyboard, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, Keyboard, Modal, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { responsive } from '../../utils/responsive';
 
 export default function SetTimer() {
   const router = useRouter();
@@ -16,8 +17,8 @@ export default function SetTimer() {
 
   const validateTime = (value, fieldName) => {
     const num = parseInt(value) || 0;
-    if (num < 1 || num > 180) {
-      setErrorMessage(`${fieldName} must be between 1 and 180 minutes`);
+    if (num < 0 || num > 180) {
+      setErrorMessage(`${fieldName} must be between 0 and 180 minutes`);
       setShowError(true);
       setTimeout(() => setShowError(false), 2000);
       return false;
@@ -81,7 +82,7 @@ export default function SetTimer() {
         </View>
 
         <View style={styles.content}>
-          <Text style={styles.sectionTitle}>Host a session</Text>
+          <Text style={styles.sectionTitle}>HOST A SESSION</Text>
           <TouchableOpacity onPress={() => router.back()} style={styles.backLink}>
             <Ionicons name="chevron-back" size={20} color="#FFF" />
             <Text style={styles.backText}>Back</Text>
@@ -258,11 +259,12 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   sectionTitle: {
-    fontSize: 26,
+    fontSize: responsive.fontSize.xxl,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   backLink: {
     flexDirection: 'row',
@@ -326,13 +328,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   timerLabel: {
-    fontSize: 16,
+    fontSize: responsive.fontSize.md,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   timerHelper: {
-    fontSize: 11,
+    fontSize: responsive.fontSize.xs,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 8,
@@ -342,26 +344,29 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.5)',
     borderRadius: 12,
-    paddingVertical: 10,
+    paddingVertical: responsive.padding.sm,
     paddingHorizontal: 12,
-    fontSize: 20,
+    fontSize: responsive.fontSize.xl,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     textAlign: 'center',
     width: '100%',
+    minHeight: 60,
   },
   totalDisplay: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.5)',
     borderRadius: 12,
-    paddingVertical: 10,
+    paddingVertical: responsive.padding.sm,
     paddingHorizontal: 12,
     width: '100%',
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 60,
   },
   totalText: {
-    fontSize: 24,
+    fontSize: responsive.fontSize.xxl,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
   },
@@ -391,13 +396,13 @@ const styles = StyleSheet.create({
   nextButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: responsive.padding.md,
     width: '100%',
     alignItems: 'center',
   },
   nextButtonText: {
-    fontSize: 18,
-    fontFamily: 'Poppins_600SemiBold',
+    fontSize: responsive.fontSize.xl,
+    fontFamily: 'Poppins_700Bold',
     color: '#000',
   },
   modalOverlay: {

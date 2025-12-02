@@ -77,8 +77,8 @@ export const responsive = {
   
   // Font sizes
   fontSize: {
-    xs: scaleFontSize(10),
-    sm: scaleFontSize(12),
+    xs: scaleFontSize(11),
+    sm: scaleFontSize(13),
     md: scaleFontSize(14),
     lg: scaleFontSize(16),
     xl: scaleFontSize(20),

@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { responsive } from '../../utils/responsive';
 
 export default function BlockedApps() {
   const router = useRouter();
@@ -50,7 +51,7 @@ export default function BlockedApps() {
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <Text style={styles.subtitle}>
-            These apps will be blocked during your focus sessions
+            Apps blocked during focus sessions
           </Text>
 
           <View style={styles.appsList}>
@@ -62,7 +63,6 @@ export default function BlockedApps() {
                   </View>
                   <View style={styles.appInfo}>
                     <Text style={styles.appName}>{app.name}</Text>
-                    <Text style={styles.appStat}>×{app.preventions} preventions</Text>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     width: 28,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: responsive.fontSize.xxl,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
   },
@@ -160,11 +160,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: responsive.fontSize.md,
     fontFamily: 'Poppins_400Regular',
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 20,
-    lineHeight: 20,
+    lineHeight: responsive.fontSize.md * 1.4,
   },
   appsList: {
     gap: 12,
@@ -195,15 +195,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   appName: {
-    fontSize: 16,
-    fontFamily: 'Poppins_600SemiBold',
+    fontSize: responsive.fontSize.lg,
+    fontFamily: 'Poppins_700Bold',
     color: '#000',
-    marginBottom: 2,
-  },
-  appStat: {
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    color: '#666',
   },
   removeButton: {
     padding: 4,
@@ -220,7 +214,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   addButtonText: {
-    fontSize: 16,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
   },
@@ -235,10 +229,10 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
-    lineHeight: 16,
+    lineHeight: responsive.fontSize.sm * 1.4,
   },
   modalOverlay: {
     flex: 1,
@@ -254,7 +248,7 @@ const styles = StyleSheet.create({
     maxWidth: 340,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: responsive.fontSize.xl,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
     marginBottom: 16,
@@ -262,9 +256,9 @@ const styles = StyleSheet.create({
   modalInput: {
     backgroundColor: '#F5F5F5',
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
+    paddingHorizontal: responsive.padding.md,
+    paddingVertical: responsive.padding.sm,
+    fontSize: responsive.fontSize.md,
     fontFamily: 'Poppins_400Regular',
     color: '#000',
     marginBottom: 20,

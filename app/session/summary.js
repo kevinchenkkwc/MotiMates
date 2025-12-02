@@ -1,7 +1,8 @@
 import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, Modal, Keyboard, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
-import { getSession, getSessionParticipants, getFocusGoals, saveReflection, getCurrentUser } from '../../utils/api';
+import { getSession, getSessionParticipants, getFocusGoals, saveReflection, getCurrentUser, leaveSession } from '../../utils/api';
+import { supabase } from '../../utils/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function SessionSummary() {
@@ -61,6 +62,39 @@ export default function SessionSummary() {
         await saveReflection(sessionId, reflection.trim());
       } catch (e) {
         console.error('Failed to save reflection:', e);
+      }
+    }
+
+    // Leave the session
+    if (sessionId) {
+      try {
+        await leaveSession(sessionId);
+        
+        // Check if user is host - if so, mark session as ended
+        const { data: sessionData } = await supabase
+          .from('sessions')
+          .select('host_id')
+          .eq('id', sessionId)
+          .single();
+        
+        if (sessionData && sessionData.host_id === currentUserId) {
+          // Host is leaving - end the session
+          await supabase
+            .from('sessions')
+            .update({ status: 'ended', ended_at: new Date().toISOString() })
+            .eq('id', sessionId);
+        }
+        
+        // Broadcast participant change
+        const channel = supabase.channel(`session:${sessionId}`);
+        await channel.send({
+          type: 'broadcast',
+          event: 'participant_change',
+          payload: { userId: currentUserId, action: 'left' },
+        });
+        await supabase.removeChannel(channel);
+      } catch (e) {
+        console.error('Failed to leave session:', e);
       }
     }
 
@@ -240,9 +274,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 30,
-    paddingTop: 64,
-    paddingBottom: 32,
   },
   title: {
     fontSize: 20,

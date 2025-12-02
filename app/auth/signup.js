@@ -1,5 +1,6 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ImageBackground } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { responsive } from '../../utils/responsive';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { signUpWithEmail } from '../../utils/api';
@@ -35,8 +36,7 @@ export default function Signup() {
       if (hasSession) {
         router.replace('/tabs/3-home');
       } else {
-        setInfo('Check your email to confirm your account, then log in.');
-        router.replace('/auth/login');
+        setInfo('✉️ Verification email sent! Check your inbox, tap the link (it may not work in-browser), then return here to log in.');
       }
     } catch (e) {
       setError(e.message || 'Unable to sign up. Please try again.');
@@ -56,14 +56,19 @@ export default function Signup() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
       <View style={styles.container}>
-        <LinearGradient
-          colors={['#FFB84D', '#FF6B35', '#5D2E1F']}
-          style={styles.gradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        />
-        
-        <View style={styles.curvedContainer}>
+        <ImageBackground
+          source={require('../../assets/background.png')}
+          style={styles.background}
+          resizeMode="cover"
+        >
+          <LinearGradient
+            colors={['rgba(255, 184, 77, 0.3)', 'rgba(255, 107, 53, 0.3)', 'rgba(93, 46, 31, 0.4)']}
+            style={styles.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          />
+          
+          <View style={styles.curvedContainer}>
           <View style={styles.formContainer}>
             <Text style={styles.title}>MotiMates</Text>
             <Text style={styles.tagline}>Lock in together.</Text>
@@ -118,6 +123,7 @@ export default function Signup() {
             </View>
           </View>
         </View>
+        </ImageBackground>
       </View>
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
@@ -127,7 +133,12 @@ export default function Signup() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#5D2E1F',
+    backgroundColor: '#8B4513',
+  },
+  background: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   gradient: {
     position: 'absolute',
@@ -142,55 +153,57 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    paddingTop: 50,
-    paddingHorizontal: 40,
-    paddingBottom: 60,
-    minHeight: '65%',
+    borderTopLeftRadius: responsive.isTablet ? 60 : 40,
+    borderTopRightRadius: responsive.isTablet ? 60 : 40,
+    paddingTop: responsive.padding.xl,
+    paddingHorizontal: responsive.contentPadding * 1.5,
+    paddingBottom: responsive.padding.xl * 2,
+    minHeight: '70%',
+    width: '100%',
+    maxWidth: responsive.maxWidth,
   },
   title: {
-    fontSize: 48,
+    fontSize: responsive.fontSize.huge,
     fontFamily: 'Poppins_700Bold',
     color: '#000000',
-    marginBottom: 8,
+    marginBottom: responsive.padding.sm,
   },
   tagline: {
-    fontSize: 16,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_400Regular',
     color: '#666666',
-    marginBottom: 32,
+    marginBottom: responsive.padding.xl,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: responsive.padding.lg,
   },
   label: {
-    fontSize: 12,
+    fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000000',
-    marginBottom: 8,
+    marginBottom: responsive.padding.sm,
     letterSpacing: 0.5,
   },
   input: {
     backgroundColor: '#E0E0E0',
     borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    fontSize: 16,
+    paddingHorizontal: responsive.padding.md,
+    paddingVertical: responsive.padding.md,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_400Regular',
     color: '#000000',
   },
   signupButton: {
     backgroundColor: '#8B1E1E',
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: responsive.padding.md,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 20,
+    marginTop: responsive.padding.md,
+    marginBottom: responsive.padding.md,
   },
   signupButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: responsive.fontSize.xl,
     fontFamily: 'Poppins_600SemiBold',
   },
   loginContainer: {
@@ -199,27 +212,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loginText: {
-    fontSize: 14,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_400Regular',
     color: '#666666',
   },
   loginLink: {
-    fontSize: 14,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
   },
   errorText: {
-    marginTop: 8,
+    marginTop: responsive.padding.sm,
+    marginBottom: responsive.padding.sm,
     textAlign: 'center',
     color: '#B71C1C',
-    fontSize: 12,
+    fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_400Regular',
   },
   infoText: {
-    marginTop: 4,
+    marginTop: responsive.padding.sm,
+    marginBottom: responsive.padding.sm,
+    paddingHorizontal: responsive.padding.sm,
     textAlign: 'center',
-    color: '#666666',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
+    color: '#2196F3',
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_600SemiBold',
+    lineHeight: responsive.fontSize.md * 1.4,
   },
 });

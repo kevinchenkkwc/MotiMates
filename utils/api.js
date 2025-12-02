@@ -442,6 +442,22 @@ export async function updateGoalCompletion(goalId, isCompleted) {
   return data;
 }
 
+export async function leaveSession(sessionId) {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  const user = authData?.user;
+  if (!user) throw new Error('Not signed in');
+
+  const { error } = await supabase
+    .from('session_participants')
+    .delete()
+    .eq('session_id', sessionId)
+    .eq('user_id', user.id);
+
+  if (error) throw error;
+  return true;
+}
+
 // REFLECTIONS
 export async function saveReflection(sessionId, reflectionText) {
   const { data: authData, error: authError } = await supabase.auth.getUser();

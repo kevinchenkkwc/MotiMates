@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, S
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { supabase } from '../../utils/supabase';
+import { leaveSession } from '../../utils/api';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { responsive } from '../../utils/responsive';
 
@@ -28,6 +29,35 @@ export default function EarlyExit() {
         });
       }
 
+      // Leave the session (remove from participants)
+      if (sessionId) {
+        await leaveSession(sessionId);
+        
+        // Check if user is host - if so, mark session as ended
+        const { data: sessionData } = await supabase
+          .from('sessions')
+          .select('host_id')
+          .eq('id', sessionId)
+          .single();
+        
+        if (sessionData && sessionData.host_id === userId) {
+          // Host is leaving - end the session
+          await supabase
+            .from('sessions')
+            .update({ status: 'ended', ended_at: new Date().toISOString() })
+            .eq('id', sessionId);
+        }
+        
+        // Broadcast participant change
+        const channel = supabase.channel(`session:${sessionId}`);
+        await channel.send({
+          type: 'broadcast',
+          event: 'participant_change',
+          payload: { userId, action: 'left' },
+        });
+        await supabase.removeChannel(channel);
+      }
+
       setSubmitted(true);
       setTimeout(() => {
         router.replace('/tabs/3-home');
@@ -39,7 +69,42 @@ export default function EarlyExit() {
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    try {
+      // Leave the session even if skipping reflection
+      if (sessionId) {
+        const { data: authData } = await supabase.auth.getUser();
+        const userId = authData?.user?.id;
+        
+        await leaveSession(sessionId);
+        
+        // Check if user is host - if so, mark session as ended
+        const { data: sessionData } = await supabase
+          .from('sessions')
+          .select('host_id')
+          .eq('id', sessionId)
+          .single();
+        
+        if (sessionData && sessionData.host_id === userId) {
+          // Host is leaving - end the session
+          await supabase
+            .from('sessions')
+            .update({ status: 'ended', ended_at: new Date().toISOString() })
+            .eq('id', sessionId);
+        }
+        
+        // Broadcast participant change
+        const channel = supabase.channel(`session:${sessionId}`);
+        await channel.send({
+          type: 'broadcast',
+          event: 'participant_change',
+          payload: { userId, action: 'left' },
+        });
+        await supabase.removeChannel(channel);
+      }
+    } catch (e) {
+      console.error('Failed to leave session:', e);
+    }
     router.replace('/tabs/3-home');
   };
 
@@ -152,21 +217,21 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
   },
   reasonCard: {
-    backgroundColor: 'rgba(255, 184, 77, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 16,
     padding: responsive.padding.md,
     marginBottom: responsive.padding.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 184, 77, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   reasonLabel: {
-    fontSize: responsive.fontSize.sm,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#FFB84D',
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_700Bold',
+    color: '#FFFFFF',
     marginBottom: responsive.padding.xs,
   },
   reasonText: {
-    fontSize: responsive.fontSize.md,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
   },

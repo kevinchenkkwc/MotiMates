@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView, Modal, TextInput, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
-import { getSessionParticipants, getFocusGoals, getCurrentUser, endSession, createUnlockRequest, voteOnUnlockRequest, getPendingUnlockRequests } from '../../utils/api';
+import { getSessionParticipants, getFocusGoals, getCurrentUser, endSession, createUnlockRequest, voteOnUnlockRequest, getPendingUnlockRequests, saveFocusGoals } from '../../utils/api';
 import { supabase } from '../../utils/supabase';
 import { Audio } from 'expo-av';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -37,6 +37,9 @@ export default function ActiveSession() {
   const [incomingRequest, setIncomingRequest] = useState(null);
   const [sound, setSound] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [showEditGoalsModal, setShowEditGoalsModal] = useState(false);
+  const [newGoalText, setNewGoalText] = useState('');
+  const sessionEndingNaturally = useRef(false);
 
   useEffect(() => {
     loadSessionData();
@@ -131,8 +134,30 @@ export default function ActiveSession() {
     // Poll for participant updates every 5 seconds
     const interval = setInterval(async () => {
       try {
+        // Check session status
+        const { data: sessionData } = await supabase
+          .from('sessions')
+          .select('status')
+          .eq('id', sessionId)
+          .single();
+        
+        // If session ended (e.g., host left), redirect to home
+        // BUT don't redirect if we're naturally ending (timer reached 0)
+        if (sessionData && sessionData.status === 'ended' && !sessionEndingNaturally.current) {
+          console.log('[Active] Session ended by host/external, redirecting to home');
+          router.replace('/tabs/3-home');
+          return;
+        }
+        
         const parts = await getSessionParticipants(sessionId);
         setParticipants(parts);
+        
+        // Delete session if no participants remain
+        if (parts.length === 0) {
+          console.log('[Active] No participants left, deleting session');
+          await deleteEmptySession(sessionId);
+          router.replace('/tabs/3-home');
+        }
       } catch (e) {
         console.error('Failed to poll participants:', e);
       }
@@ -158,15 +183,18 @@ export default function ActiveSession() {
       
       if (remaining <= 0) {
         clearInterval(interval);
+        sessionEndingNaturally.current = true; // Mark as natural end
         handleEndSession();
-        router.push({
-          pathname: '/session/summary',
-          params: {
-            sessionId,
-            sessionName,
-            totalMinutes: totalMinutes?.toString() || '0',
-          },
-        });
+        setTimeout(() => {
+          router.push({
+            pathname: '/session/summary',
+            params: {
+              sessionId,
+              sessionName,
+              totalMinutes: totalMinutes?.toString() || '0',
+            },
+          });
+        }, 100); // Small delay to ensure handleEndSession completes
         setTimeLeft(0);
       } else {
         setTimeLeft(remaining);
@@ -231,6 +259,80 @@ export default function ActiveSession() {
       return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const deleteEmptySession = async (sessionId) => {
+    try {
+      const { data, error } = await supabase
+        .from('sessions')
+        .delete()
+        .eq('id', sessionId);
+      
+      if (error) throw error;
+      console.log('[Active] Empty session deleted');
+    } catch (e) {
+      console.error('Failed to delete empty session:', e);
+    }
+  };
+
+  const addNewGoal = async () => {
+    const text = newGoalText.trim();
+    if (!text) return;
+
+    try {
+      // Canonical list of existing goal texts
+      const existingTexts = goalItems
+        .map((g) => g.goal_text || g.text)
+        .filter(Boolean);
+
+      // If this exact text already exists, don't duplicate it
+      const updatedTexts = existingTexts.includes(text)
+        ? existingTexts
+        : [...existingTexts, text];
+
+      // Optimistically update UI only if it's a brand new text
+      if (!existingTexts.includes(text)) {
+        const localGoal = {
+          id: Date.now().toString(),
+          goal_text: text,
+          is_completed: false,
+        };
+        setGoalItems((prev) => [...prev, localGoal]);
+      }
+
+      setNewGoalText('');
+
+      // Persist deduped texts to database
+      await saveFocusGoals(sessionId, updatedTexts);
+      
+      // Reload from DB to get canonical rows/IDs
+      const goals = await getFocusGoals(sessionId, currentUserId);
+      setGoalItems(goals);
+    } catch (e) {
+      console.error('Failed to add goal:', e);
+      Alert.alert('Error', 'Failed to add goal');
+    }
+  };
+
+  const deleteGoal = async (goalId) => {
+    try {
+      // Remove from UI
+      const updatedGoals = goalItems.filter(g => g.id !== goalId);
+      setGoalItems(updatedGoals);
+      
+      // Delete from database
+      const { error } = await supabase
+        .from('focus_goals')
+        .delete()
+        .eq('id', goalId);
+      
+      if (error) throw error;
+    } catch (e) {
+      console.error('Failed to delete goal:', e);
+      // Reload to revert
+      const goals = await getFocusGoals(sessionId, currentUserId);
+      setGoalItems(goals);
+    }
   };
 
   const toggleGoal = async (id) => {
@@ -537,9 +639,9 @@ export default function ActiveSession() {
               />
             </TouchableOpacity>
           </View>
-          <Text style={styles.subtitle}>{sessionName || "WE'RE LOCKED IN"}</Text>
+          <Text style={styles.sessionNameHeader}>{sessionName || "WE'RE LOCKED IN"}</Text>
 
-          <Text style={styles.timerLabel}>Time remaining</Text>
+          <Text style={styles.timerLabel}>TIME REMAINING</Text>
           <View style={styles.timerContainer}>
             <View style={styles.progressRing} />
             <View style={styles.timerCircle}>
@@ -563,8 +665,19 @@ export default function ActiveSession() {
 
           
 
+          {motivation && (
+            <View style={styles.motivationQuote}>
+              <Text style={styles.quoteText}>"{motivation.text}"</Text>
+            </View>
+          )}
+
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Focus Goals</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Focus Goals</Text>
+              <TouchableOpacity onPress={() => setShowEditGoalsModal(true)} style={styles.editButton}>
+                <Ionicons name="pencil" size={16} color="#FFF" />
+              </TouchableOpacity>
+            </View>
             <View style={styles.goalCard}>
               {goalItems && goalItems.length > 0 ? (
                 goalItems.map((item) => (
@@ -574,9 +687,9 @@ export default function ActiveSession() {
                     onPress={() => toggleGoal(item.id)}
                   >
                     <Ionicons
-                      name={item.is_completed ? 'checkbox-outline' : 'square-outline'}
-                      size={18}
-                      color="#000"
+                      name={item.is_completed ? 'checkbox' : 'square-outline'}
+                      size={20}
+                      color="#FFF"
                       style={styles.goalCheckbox}
                     />
                     <Text
@@ -590,8 +703,8 @@ export default function ActiveSession() {
                   </TouchableOpacity>
                 ))
               ) : (
-                <Text style={styles.goalText}>
-                  • Stay focused{'\n'}• Complete your tasks
+                <Text style={styles.emptyGoalsText}>
+                  No goals set for this session
                 </Text>
               )}
             </View>
@@ -613,14 +726,6 @@ export default function ActiveSession() {
               ))}
             </View>
           </View>
-
-          {/* Motivational message (at most one at a time) */}
-          {motivation && (
-            <View style={styles.motivationBanner}>
-              <Ionicons name={motivation.icon} size={20} color={motivation.color} />
-              <Text style={styles.motivationText}>{motivation.text}</Text>
-            </View>
-          )}
 
           <TouchableOpacity 
             style={[styles.exitButton, pendingRequest && styles.exitButtonPending]} 
@@ -713,6 +818,54 @@ export default function ActiveSession() {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Goals Modal */}
+      <Modal
+        visible={showEditGoalsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditGoalsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.editGoalsModalContent}>
+            <View style={styles.editGoalsHeader}>
+              <Text style={styles.modalTitle}>Edit Goals</Text>
+              <TouchableOpacity onPress={() => setShowEditGoalsModal(false)}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.editGoalsList}>
+              {goalItems.map((goal) => (
+                <View key={goal.id} style={styles.editGoalRow}>
+                  <Text style={styles.editGoalText} numberOfLines={2}>{goal.goal_text || goal.text}</Text>
+                  <TouchableOpacity onPress={() => deleteGoal(goal.id)} style={styles.deleteGoalButton}>
+                    <Ionicons name="trash-outline" size={20} color="#B71C1C" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {goalItems.length === 0 && (
+                <Text style={styles.noGoalsText}>No goals yet. Add one below!</Text>
+              )}
+            </ScrollView>
+
+            <View style={styles.addGoalRow}>
+              <TextInput
+                style={styles.addGoalInput}
+                value={newGoalText}
+                onChangeText={setNewGoalText}
+                placeholder="New goal..."
+                placeholderTextColor="#999"
+                returnKeyType="done"
+                onSubmitEditing={addNewGoal}
+              />
+              <TouchableOpacity style={styles.addGoalButton} onPress={addNewGoal}>
+                <Ionicons name="add" size={24} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -794,6 +947,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
   },
+  sessionNameHeader: {
+    fontSize: 28,
+    fontFamily: 'Poppins_700Bold',
+    color: '#FFFFFF',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
   subtitle: {
     fontSize: 20,
     fontFamily: 'Poppins_700Bold',
@@ -836,15 +996,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   timerLabel: {
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    fontFamily: 'Poppins_700Bold',
+    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 20,
+    letterSpacing: 1.5,
   },
   timerContainer: {
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
     position: 'relative',
   },
   progressRing: {
@@ -925,37 +1086,41 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
+    fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
-    marginBottom: 8,
+    marginBottom: 12,
+    letterSpacing: 0.5,
   },
   goalCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     padding: 16,
   },
   goalText: {
-    fontSize: 14,
-    fontFamily: 'Poppins_400Regular',
-    color: '#000',
+    fontSize: 15,
+    fontFamily: 'Poppins_500Medium',
+    color: '#FFF',
     marginBottom: 4,
+    flex: 1,
   },
   goalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    paddingVertical: 10,
   },
   goalCheckbox: {
-    marginRight: 8,
+    marginRight: 12,
   },
   goalTextCompleted: {
     textDecorationLine: 'line-through',
-    color: '#666',
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   participantsRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     flexWrap: 'wrap',
     gap: 16,
   },
@@ -1266,24 +1431,97 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
     color: '#666',
   },
-  motivationBanner: {
+  motivationQuote: {
+    marginBottom: 20,
+    paddingHorizontal: 24,
+  },
+  quoteText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    fontStyle: 'italic',
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  editButton: {
+    padding: 4,
+  },
+  emptyGoalsText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+    paddingVertical: 8,
+  },
+  editGoalsModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    width: '90%',
+    maxHeight: '70%',
+    padding: 20,
+  },
+  editGoalsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  editGoalsList: {
+    maxHeight: 300,
+    marginBottom: 16,
+  },
+  editGoalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F5F5F5',
     borderRadius: 12,
     padding: 12,
-    marginBottom: 16,
-    gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 8,
   },
-  motivationText: {
-    fontSize: 13,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#333',
+  editGoalText: {
     flex: 1,
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#000',
+    marginRight: 8,
+  },
+  deleteGoalButton: {
+    padding: 4,
+  },
+  noGoalsText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#999',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  addGoalRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  addGoalInput: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#000',
+  },
+  addGoalButton: {
+    backgroundColor: '#8B1E1E',
+    borderRadius: 12,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

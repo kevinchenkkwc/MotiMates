@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { getCurrentUser, getProfile } from '../../utils/api';
 import { responsive } from '../../utils/responsive';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 export default function Home() {
   const router = useRouter();
@@ -55,10 +56,14 @@ export default function Home() {
     })();
   }, []);
 
-  const blockedApps = [
-    { name: 'Instagram', preventions: 'x5 preventions' },
-    { name: 'TikTok', preventions: 'x17 preventions' },
-  ];
+  const [blockedApps, setBlockedApps] = useState([
+    { id: 1, name: 'Instagram', icon: 'instagram', color: '#E4405F' },
+    { id: 2, name: 'TikTok', icon: 'music-note', color: '#000000' },
+  ]);
+
+  const handleMinimizeApp = (appId) => {
+    setBlockedApps(blockedApps.filter(app => app.id !== appId));
+  };
 
   const friends = [
     { name: 'Derek Bao', status: 'Online', color: '#90EE90' },
@@ -121,26 +126,35 @@ export default function Home() {
 
         <View style={styles.blockedAppsSection}>
           <Text style={styles.sectionTitle}>Blocked Apps</Text>
-          <View style={styles.blockedAppsContainer}>
-            {blockedApps.map((app, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={styles.blockedAppCard}
-              >
-                <Text style={styles.blockedAppName}>{app.name}</Text>
-                <View style={styles.preventionRow}>
-                  <Text style={styles.preventionText}>{app.preventions}</Text>
-                  <Text style={styles.arrowText}>›</Text>
+          <ScrollView 
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.blockedAppsScrollContainer}
+          >
+            {blockedApps.map((app) => (
+              <View key={app.id} style={styles.blockedAppCard}>
+                <TouchableOpacity 
+                  style={styles.appMinimizeButton}
+                  onPress={() => handleMinimizeApp(app.id)}
+                >
+                  <MaterialCommunityIcons name="close" size={14} color="rgba(255, 255, 255, 0.6)" />
+                </TouchableOpacity>
+                <View style={[styles.appIconCircle, { backgroundColor: app.color }]}>
+                  <MaterialCommunityIcons name={app.icon} size={32} color="#FFF" />
                 </View>
-              </TouchableOpacity>
+                <Text style={styles.blockedAppName} numberOfLines={1}>{app.name}</Text>
+              </View>
             ))}
             <TouchableOpacity 
-              style={styles.addButton}
+              style={styles.addAppCard}
               onPress={() => router.push('/blocked-apps')}
             >
-              <Text style={styles.addButtonText}>+</Text>
+              <View style={styles.addAppCircle}>
+                <MaterialCommunityIcons name="plus" size={32} color="#FFF" />
+              </View>
+              <Text style={styles.addAppText}>Add</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
 
         <View style={styles.motiMatesSection}>
@@ -153,8 +167,10 @@ export default function Home() {
                     <Text style={styles.friendInitial}>{friend.name.charAt(0)}</Text>
                   </View>
                   <Text style={styles.friendName}>{friend.name}</Text>
-                  <View style={[styles.statusDot, { backgroundColor: friend.color }]} />
-                  <Text style={styles.friendStatus}>{friend.status}</Text>
+                  <View style={styles.statusRow}>
+                    <Text style={styles.friendStatus}>{friend.status}</Text>
+                    <View style={[styles.statusDot, { backgroundColor: friend.color }]} />
+                  </View>
                 </View>
               ))}
               <TouchableOpacity 
@@ -275,49 +291,65 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: responsive.padding.sm,
   },
-  blockedAppsContainer: {
-    flexDirection: 'row',
-    gap: responsive.padding.sm,
-    flexWrap: 'wrap',
+  blockedAppsScrollContainer: {
+    paddingRight: responsive.contentPadding,
+    gap: 12,
   },
   blockedAppCard: {
     backgroundColor: 'rgba(139, 69, 19, 0.6)',
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    padding: responsive.padding.md,
-    width: responsive.isTablet ? 160 : 140,
+    padding: 16,
+    width: 110,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  appMinimizeButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 1,
+  },
+  appIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   blockedAppName: {
-    fontSize: responsive.fontSize.lg,
-    fontFamily: 'Poppins_700Bold',
-    color: '#FFFFFF',
-    marginBottom: responsive.padding.lg,
-  },
-  preventionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  preventionText: {
     fontSize: responsive.fontSize.sm,
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
+    textAlign: 'center',
   },
-  addButton: {
-    backgroundColor: 'rgba(139, 69, 19, 0.6)',
+  addAppCard: {
+    backgroundColor: 'rgba(139, 69, 19, 0.4)',
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    width: 60,
-    height: 100,
+    borderStyle: 'dashed',
+    padding: 16,
+    width: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addAppCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  addButtonText: {
-    fontSize: 40,
+  addAppText: {
+    fontSize: responsive.fontSize.sm,
+    fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
-    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
   },
   motiMatesSection: {
     paddingHorizontal: responsive.contentPadding,
@@ -363,11 +395,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 2,
   },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginBottom: 2,
   },
   friendStatus: {
     fontSize: responsive.fontSize.xs,

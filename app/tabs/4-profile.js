@@ -129,32 +129,6 @@ export default function Profile() {
             )}
           </View>
 
-          <View style={styles.blockedAppsSection}>
-            <Text style={styles.sectionTitle}>Blocked Apps</Text>
-            <View style={styles.blockedAppsRow}>
-              <TouchableOpacity 
-                style={styles.appCard}
-                onPress={() => router.push('/blocked-apps')}
-              >
-                <Text style={styles.appName}>Instagram</Text>
-                <Text style={styles.appStat}>x5 preventions</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.appCard}
-                onPress={() => router.push('/blocked-apps')}
-              >
-                <Text style={styles.appName}>TikTok</Text>
-                <Text style={styles.appStat}>x17 preventions</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.addAppCard}
-                onPress={() => router.push('/blocked-apps')}
-              >
-                <Text style={styles.addAppText}>+</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
           <TouchableOpacity
             style={styles.reflectionsButton}
             onPress={() => router.push('/profile/reflections')}
@@ -278,7 +252,7 @@ const styles = StyleSheet.create({
   },
   bioText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     fontStyle: 'italic',
@@ -294,7 +268,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     borderRadius: 8,
     padding: 12,
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Poppins_400Regular',
     color: '#333',
     minHeight: 60,
@@ -313,7 +287,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E0E0',
   },
   bioCancelText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Poppins_600SemiBold',
     color: '#666',
   },
@@ -324,7 +298,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#8B1E1E',
   },
   bioSaveText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFF',
   },
@@ -332,48 +306,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  blockedAppsSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: 'Poppins_700Bold',
-    color: '#FFFFFF',
-    marginBottom: 12,
-  },
-  blockedAppsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  appCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 12,
-    padding: 16,
-  },
-  appName: {
-    fontSize: 16,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#000',
-    marginBottom: 4,
-  },
-  appStat: {
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    color: '#666',
-  },
-  addAppCard: {
-    width: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addAppText: {
-    fontSize: 32,
-    fontFamily: 'Poppins_400Regular',
-    color: '#666',
   },
   reflectionsButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -385,7 +317,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   reflectionsText: {
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
   },
@@ -435,7 +367,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   leaderName: {
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
   },
@@ -457,7 +389,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
   },

@@ -45,21 +45,38 @@ export default function Join() {
   const loadActiveSessions = async () => {
     try {
       const data = await listPublicActiveSessions();
-
-      // Filter out sessions that have no time left (e.g. show 0 min left)
+      // Filter out ended sessions and sessions with 0 time remaining
       const now = Date.now();
-      const filtered = (data || []).filter((session) => {
-        if (session.status === 'in_progress' && session.started_at) {
-          const elapsedMs = now - new Date(session.started_at).getTime();
-          const totalMs = (session.work_minutes || 60) * 60 * 1000;
-          const remainingMinutes = Math.floor((totalMs - elapsedMs) / 1000 / 60);
-          return remainingMinutes > 0;
+      const activeSessions = (data || []).filter(s => {
+        // Must be active or in_progress
+        if (s.status !== 'active' && s.status !== 'in_progress') return false;
+        
+        // Must have at least one participant
+        if (!s.session_participants || s.session_participants.length === 0) return false;
+        
+        // If in_progress, check if time hasn't expired
+        if (s.status === 'in_progress' && s.started_at) {
+          let totalMinutes;
+          if (s.mode === 'pomodoro') {
+            const work = s.work_minutes || 25;
+            const shortBreak = s.short_break_minutes || 5;
+            const longBreak = s.long_break_minutes || 15;
+            totalMinutes = work * 4 + shortBreak * 3 + longBreak;
+          } else {
+            totalMinutes = s.work_minutes || 60;
+          }
+          
+          const elapsedMs = now - new Date(s.started_at).getTime();
+          const totalMs = totalMinutes * 60 * 1000;
+          const remainingMs = totalMs - elapsedMs;
+          
+          // Filter out if time has expired
+          if (remainingMs <= 0) return false;
         }
-        // For 'active' (not yet started) sessions, always show
+        
         return true;
       });
-
-      setSessions(filtered);
+      setSessions(activeSessions);
     } catch (e) {
       console.error('Failed to load sessions:', e);
     } finally {
@@ -151,15 +168,23 @@ export default function Join() {
         </View>
 
         <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.sectionTitle}>Join an Active Session!</Text>
+          <Text style={styles.sectionTitle}>Join a Public Session!</Text>
 
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#FFF" />
             </View>
-          ) : sessions.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>no active sessions ☹️</Text>
+          ) : sessions.length === 0 && !loading ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="people-outline" size={64} color="rgba(255, 255, 255, 0.4)" />
+              <Text style={styles.emptyText}>No active sessions</Text>
+              <Text style={styles.emptySubtext}>Be the first to start a co-focus session!</Text>
+              <TouchableOpacity 
+                style={styles.createSessionButton}
+                onPress={() => router.push('/tabs/1-host')}
+              >
+                <Text style={styles.createSessionText}>Host a Session</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             sessions.map((session) => {
@@ -174,7 +199,7 @@ export default function Join() {
                 >
                   <View style={styles.sessionHeader}>
                     <Text style={styles.sessionName} numberOfLines={1}>
-                      Room #{session.invite_code}: {session.name || 'Untitled'}
+                      {session.name || 'Untitled Session'}
                     </Text>
                     <Ionicons name="chevron-forward" size={20} color="#000" />
                   </View>
@@ -328,6 +353,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.8)',
   },
+  emptySubtext: {
+    fontSize: responsive.fontSize.sm,
+    fontFamily: 'Poppins_400Regular',
+    color: '#FFFFFF',
+    marginTop: 4,
+  },
   sessionCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 16,
@@ -459,5 +490,17 @@ const styles = StyleSheet.create({
     fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
+  },
+  createSessionButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    marginTop: 16,
+  },
+  createSessionText: {
+    fontSize: responsive.fontSize.md,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#8B1E1E',
   },
 });

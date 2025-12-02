@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ImageBackground } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -42,14 +42,19 @@ export default function Login() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
       <View style={styles.container}>
-        <LinearGradient
-          colors={['#FFB84D', '#FF6B35', '#5D2E1F']}
-          style={styles.gradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        />
-        
-        <View style={styles.curvedContainer}>
+        <ImageBackground
+          source={require('../../assets/background.png')}
+          style={styles.background}
+          resizeMode="cover"
+        >
+          <LinearGradient
+            colors={['rgba(255, 184, 77, 0.3)', 'rgba(255, 107, 53, 0.3)', 'rgba(93, 46, 31, 0.4)']}
+            style={styles.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          />
+          
+          <View style={styles.curvedContainer}>
           <View style={styles.formContainer}>
             <Text style={styles.title}>MotiMates</Text>
             <Text style={styles.tagline}>Friends don't let friends doomscroll.</Text>
@@ -92,6 +97,7 @@ export default function Login() {
             </View>
           </View>
         </View>
+        </ImageBackground>
       </View>
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
@@ -101,7 +107,12 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#5D2E1F',
+    backgroundColor: '#8B4513',
+  },
+  background: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   gradient: {
     position: 'absolute',
@@ -120,7 +131,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: responsive.isTablet ? 60 : 40,
     borderTopRightRadius: responsive.isTablet ? 60 : 40,
     paddingTop: responsive.padding.xl,
-    paddingHorizontal: responsive.contentPadding,
+    paddingHorizontal: responsive.contentPadding * 1.5,
     paddingBottom: responsive.padding.xl * 2,
     minHeight: '65%',
     width: '100%',
@@ -176,12 +187,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   signupText: {
-    fontSize: responsive.fontSize.md,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_400Regular',
     color: '#666666',
   },
   signupLink: {
-    fontSize: responsive.fontSize.md,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
   },
