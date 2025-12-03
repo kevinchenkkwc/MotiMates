@@ -1,9 +1,14 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, Modal, Keyboard, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, Modal, Keyboard, ScrollView, ActivityIndicator, KeyboardAvoidingView, TouchableWithoutFeedback, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { getSession, getSessionParticipants, getFocusGoals, saveReflection, getCurrentUser, leaveSession } from '../../utils/api';
 import { supabase } from '../../utils/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { responsive } from '../../utils/responsive';
+
+const dismissKeyboard = () => {
+  Keyboard.dismiss();
+};
 
 export default function SessionSummary() {
   const router = useRouter();
@@ -142,7 +147,18 @@ export default function SessionSummary() {
         style={styles.background}
         resizeMode="cover"
       >
-        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+        <KeyboardAvoidingView 
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={responsive.keyboardVerticalOffset}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <ScrollView 
+              style={styles.content} 
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
           <Text style={styles.title}>{early ? 'Session Ended' : '🎉 Session Complete!'}</Text>
 
           <View style={styles.statsCard}>
@@ -225,26 +241,31 @@ export default function SessionSummary() {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Reflection ✏️</Text>
+              <Text style={styles.sectionLabel}>Quick Reflection</Text>
+              <Text style={styles.sectionSubtext}>How did this session go? What could you improve next time?</Text>
               <TextInput
                 style={styles.reflectionInput}
                 value={reflection}
                 onChangeText={setReflection}
-                placeholder="Add your notes..."
+                placeholder="I felt productive because..."
                 placeholderTextColor="#999"
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
-                returnKeyType="done"
-                blurOnSubmit={true}
               />
             </View>
           </View>
 
-          <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
-            <Text style={styles.doneButtonText}>Back to Home</Text>
-          </TouchableOpacity>
-        </ScrollView>
+              <TouchableOpacity style={styles.submitButton} onPress={handleDone}>
+                <Text style={styles.submitButtonText}>Submit Reflection</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.skipButton} onPress={() => router.replace('/tabs/3-home')}>
+                <Text style={styles.skipButtonText}>Skip for now</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
 
         <Modal
           transparent
@@ -272,11 +293,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  keyboardView: {
+    flex: 1,
+  },
   content: {
     flex: 1,
   },
   title: {
-    fontSize: 20,
+    fontSize: 28,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: 18,
@@ -288,13 +312,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
     marginBottom: 8,
   },
   cardSubtitle: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     marginBottom: 24,
@@ -303,13 +327,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionLabel: {
-    fontSize: 13,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
+    marginBottom: 4,
+  },
+  sectionSubtext: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
     marginBottom: 12,
   },
   goalsText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#333',
     lineHeight: 18,
@@ -322,7 +352,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   goalsGroupLabel: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_600SemiBold',
     color: '#555',
     marginBottom: 4,
@@ -368,22 +398,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     borderRadius: 12,
     padding: 16,
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#000',
     minHeight: 100,
   },
-  doneButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  submitButton: {
+    backgroundColor: '#8B1E1E',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  submitButtonText: {
+    fontSize: 18,
+    fontFamily: 'Poppins_700Bold',
+    color: '#FFFFFF',
+  },
+  skipButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
     marginBottom: 20,
   },
-  doneButtonText: {
-    fontSize: 18,
+  skipButtonText: {
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
-    color: '#8B1E1E',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   centerContent: {
     flex: 1,
@@ -419,7 +459,7 @@ const styles = StyleSheet.create({
     color: '#8B1E1E',
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     marginTop: 4,
@@ -458,12 +498,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   participantName: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
   },
   participantStats: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     marginTop: 2,
@@ -478,7 +518,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   goalText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#333',
     flex: 1,

@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   sessionName: {
-    fontSize: 14,
+    fontSize: 18,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
     marginBottom: 24,

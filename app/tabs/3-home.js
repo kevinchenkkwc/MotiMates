@@ -68,7 +68,7 @@ export default function Home() {
   const friends = [
     { name: 'Derek Bao', status: 'Online', color: '#90EE90' },
     { name: 'Kevin Chen', status: 'In Session', color: '#FFD700' },
-    { name: 'Austin Konig', status: 'Offline', color: '#D3D3D3' },
+    { name: 'Adam Sun', status: 'Offline', color: '#D3D3D3' },
   ];
 
 
@@ -213,9 +213,10 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: responsive.contentPadding,
     marginBottom: responsive.padding.sm,
+    marginTop: responsive.padding.md,
   },
   welcomeText: {
-    fontSize: responsive.fontSize.xxxl,
+    fontSize: 32,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: responsive.padding.md,
@@ -286,7 +287,7 @@ const styles = StyleSheet.create({
     marginTop: responsive.padding.sm,
   },
   sectionTitle: {
-    fontSize: responsive.fontSize.xxl,
+    fontSize: 24,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: responsive.padding.sm,

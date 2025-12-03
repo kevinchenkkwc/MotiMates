@@ -1,11 +1,15 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView, Modal, TextInput, Alert, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
-import { getSessionParticipants, getFocusGoals, getCurrentUser, endSession, createUnlockRequest, voteOnUnlockRequest, getPendingUnlockRequests, saveFocusGoals } from '../../utils/api';
+import { getSessionParticipants, getFocusGoals, getAllSessionGoals, getCurrentUser, endSession, createUnlockRequest, voteOnUnlockRequest, getPendingUnlockRequests, saveFocusGoals } from '../../utils/api';
 import { supabase } from '../../utils/supabase';
 import { Audio } from 'expo-av';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { responsive } from '../../utils/responsive';
+
+const dismissKeyboard = () => {
+  Keyboard.dismiss();
+};
 
 export default function ActiveSession() {
   const router = useRouter();
@@ -24,7 +28,8 @@ export default function ActiveSession() {
   const sessionStartTime = useRef(startTime ? parseInt(startTime) : Date.now());
   const totalDuration = totalMinutes ? parseInt(totalMinutes) * 60 : 3600;
   const [timeLeft, setTimeLeft] = useState(totalDuration);
-  const [goalItems, setGoalItems] = useState([]);
+  const [goalItems, setGoalItems] = useState([]); // Current user's goals (editable)
+  const [allGoals, setAllGoals] = useState([]); // All participants' goals (for display)
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -40,6 +45,7 @@ export default function ActiveSession() {
   const [showEditGoalsModal, setShowEditGoalsModal] = useState(false);
   const [newGoalText, setNewGoalText] = useState('');
   const sessionEndingNaturally = useRef(false);
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     loadSessionData();
@@ -60,9 +66,13 @@ export default function ActiveSession() {
       const parts = await getSessionParticipants(sessionId);
       setParticipants(parts);
 
-      // Load my goals
-      const goals = await getFocusGoals(sessionId, user.id);
-      setGoalItems(goals);
+      // Load my goals (for editing)
+      const myGoals = await getFocusGoals(sessionId, user.id);
+      setGoalItems(myGoals);
+
+      // Load all participants' goals (for display)
+      const allSessionGoals = await getAllSessionGoals(sessionId);
+      setAllGoals(allSessionGoals);
     } catch (e) {
       console.error('Failed to load session data:', e);
     } finally {
@@ -142,8 +152,9 @@ export default function ActiveSession() {
           .single();
         
         // If session ended (e.g., host left), redirect to home
-        // BUT don't redirect if we're naturally ending (timer reached 0)
-        if (sessionData && sessionData.status === 'ended' && !sessionEndingNaturally.current) {
+        // BUT don't redirect if we're naturally ending (timer reached 0) or already redirected
+        if (sessionData && sessionData.status === 'ended' && !sessionEndingNaturally.current && !hasRedirected.current) {
+          hasRedirected.current = true;
           console.log('[Active] Session ended by host/external, redirecting to home');
           router.replace('/tabs/3-home');
           return;
@@ -153,7 +164,8 @@ export default function ActiveSession() {
         setParticipants(parts);
         
         // Delete session if no participants remain
-        if (parts.length === 0) {
+        if (parts.length === 0 && !hasRedirected.current) {
+          hasRedirected.current = true;
           console.log('[Active] No participants left, deleting session');
           await deleteEmptySession(sessionId);
           router.replace('/tabs/3-home');
@@ -280,34 +292,38 @@ export default function ActiveSession() {
     if (!text) return;
 
     try {
-      // Canonical list of existing goal texts
+      // Check if this exact text already exists
       const existingTexts = goalItems
         .map((g) => g.goal_text || g.text)
         .filter(Boolean);
 
-      // If this exact text already exists, don't duplicate it
-      const updatedTexts = existingTexts.includes(text)
-        ? existingTexts
-        : [...existingTexts, text];
-
-      // Optimistically update UI only if it's a brand new text
-      if (!existingTexts.includes(text)) {
-        const localGoal = {
-          id: Date.now().toString(),
-          goal_text: text,
-          is_completed: false,
-        };
-        setGoalItems((prev) => [...prev, localGoal]);
+      if (existingTexts.includes(text)) {
+        // Already exists, just clear input
+        setNewGoalText('');
+        return;
       }
 
       setNewGoalText('');
 
-      // Persist deduped texts to database
-      await saveFocusGoals(sessionId, updatedTexts);
+      // Insert only the new goal directly (don't delete/re-insert all)
+      const { data, error } = await supabase
+        .from('focus_goals')
+        .insert({
+          session_id: sessionId,
+          user_id: currentUserId,
+          goal_text: text,
+          is_completed: false,
+        })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      // Add the new goal to state
+      setGoalItems((prev) => [...prev, data]);
       
-      // Reload from DB to get canonical rows/IDs
-      const goals = await getFocusGoals(sessionId, currentUserId);
-      setGoalItems(goals);
+      // Also update allGoals for display
+      setAllGoals((prev) => [...prev, { ...data, profiles: { display_name: 'You' } }]);
     } catch (e) {
       console.error('Failed to add goal:', e);
       Alert.alert('Error', 'Failed to add goal');
@@ -316,17 +332,26 @@ export default function ActiveSession() {
 
   const deleteGoal = async (goalId) => {
     try {
-      // Remove from UI
+      // Remove from UI immediately
       const updatedGoals = goalItems.filter(g => g.id !== goalId);
       setGoalItems(updatedGoals);
       
-      // Delete from database
-      const { error } = await supabase
+      // Also remove from allGoals
+      setAllGoals((prev) => prev.filter(g => g.id !== goalId));
+      
+      // Delete from database - also filter by user_id and session_id for safety
+      const { error, count } = await supabase
         .from('focus_goals')
         .delete()
-        .eq('id', goalId);
+        .eq('id', goalId)
+        .eq('user_id', currentUserId)
+        .eq('session_id', sessionId);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
+      console.log('[Active] Goal deleted from database:', goalId);
     } catch (e) {
       console.error('Failed to delete goal:', e);
       // Reload to revert
@@ -347,6 +372,13 @@ export default function ActiveSession() {
         item.id === id ? { ...item, is_completed: newCompleted } : item
       )
     );
+    
+    // Also update allGoals
+    setAllGoals((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, is_completed: newCompleted } : item
+      )
+    );
 
     // Update in database
     try {
@@ -356,6 +388,11 @@ export default function ActiveSession() {
       console.error('Failed to update goal:', e);
       // Revert on error
       setGoalItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, is_completed: !newCompleted } : item
+        )
+      );
+      setAllGoals((prev) =>
         prev.map((item) =>
           item.id === id ? { ...item, is_completed: !newCompleted } : item
         )
@@ -667,7 +704,7 @@ export default function ActiveSession() {
 
           {motivation && (
             <View style={styles.motivationQuote}>
-              <Text style={styles.quoteText}>"{motivation.text}"</Text>
+              <Text style={styles.quoteText}>{motivation.text}</Text>
             </View>
           )}
 
@@ -679,30 +716,79 @@ export default function ActiveSession() {
               </TouchableOpacity>
             </View>
             <View style={styles.goalCard}>
-              {goalItems && goalItems.length > 0 ? (
-                goalItems.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.goalRow}
-                    onPress={() => toggleGoal(item.id)}
-                  >
-                    <Ionicons
-                      name={item.is_completed ? 'checkbox' : 'square-outline'}
-                      size={20}
-                      color="#FFF"
-                      style={styles.goalCheckbox}
-                    />
-                    <Text
-                      style={[
-                        styles.goalText,
-                        item.is_completed && styles.goalTextCompleted,
-                      ]}
+              {/* Show current user's goals first (editable) */}
+              {goalItems && goalItems.length > 0 && (
+                <View style={styles.userGoalsSection}>
+                  <Text style={styles.userGoalsLabel}>Your Goals</Text>
+                  {goalItems.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.goalRow}
+                      onPress={() => toggleGoal(item.id)}
                     >
-                      {item.goal_text || item.text}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
+                      <Ionicons
+                        name={item.is_completed ? 'checkbox' : 'square-outline'}
+                        size={20}
+                        color="#FFF"
+                        style={styles.goalCheckbox}
+                      />
+                      <Text
+                        style={[
+                          styles.goalText,
+                          item.is_completed && styles.goalTextCompleted,
+                        ]}
+                      >
+                        {item.goal_text || item.text}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              
+              {/* Show other participants' goals (read-only) */}
+              {allGoals && allGoals.filter(g => g.user_id !== currentUserId).length > 0 && (
+                <View style={styles.otherGoalsSection}>
+                  {(() => {
+                    // Group goals by user
+                    const otherGoals = allGoals.filter(g => g.user_id !== currentUserId);
+                    const groupedByUser = otherGoals.reduce((acc, goal) => {
+                      const userName = goal.profiles?.display_name || 'Teammate';
+                      if (!acc[goal.user_id]) {
+                        acc[goal.user_id] = { name: userName, goals: [] };
+                      }
+                      acc[goal.user_id].goals.push(goal);
+                      return acc;
+                    }, {});
+                    
+                    return Object.entries(groupedByUser).map(([userId, userData]) => (
+                      <View key={userId} style={styles.teammateGoals}>
+                        <Text style={styles.teammateLabel}>{userData.name}'s Goals</Text>
+                        {userData.goals.map((goal) => (
+                          <View key={goal.id} style={styles.goalRow}>
+                            <Ionicons
+                              name={goal.is_completed ? 'checkbox' : 'square-outline'}
+                              size={20}
+                              color="rgba(255,255,255,0.7)"
+                              style={styles.goalCheckbox}
+                            />
+                            <Text
+                              style={[
+                                styles.goalText,
+                                styles.teammateGoalText,
+                                goal.is_completed && styles.goalTextCompleted,
+                              ]}
+                            >
+                              {goal.goal_text || goal.text}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ));
+                  })()}
+                </View>
+              )}
+              
+              {(!goalItems || goalItems.length === 0) && (!allGoals || allGoals.length === 0) && (
                 <Text style={styles.emptyGoalsText}>
                   No goals set for this session
                 </Text>
@@ -747,40 +833,47 @@ export default function ActiveSession() {
         animationType="slide"
         onRequestClose={() => setShowUnlockModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Request to Leave</Text>
-            <Text style={styles.modalSubtitle}>
-              All {participants.length - 1} study mate(s) must approve
-            </Text>
-            <TextInput
-              style={styles.reasonInput}
-              placeholder="Why do you need to leave? (required)"
-              placeholderTextColor="#999"
-              value={unlockReason}
-              onChangeText={setUnlockReason}
-              multiline
-              numberOfLines={3}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => {
-                  setShowUnlockModal(false);
-                  setUnlockReason('');
-                }}
-              >
-                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSubmit]}
-                onPress={handleRequestUnlock}
-              >
-                <Text style={styles.modalButtonTextSubmit}>Send Request</Text>
-              </TouchableOpacity>
+        <KeyboardAvoidingView 
+          style={styles.modalKeyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Request to Leave</Text>
+                <Text style={styles.modalSubtitle}>
+                  All {participants.length - 1} study mate(s) must approve
+                </Text>
+                <TextInput
+                  style={styles.reasonInput}
+                  placeholder="Why do you need to leave? (required)"
+                  placeholderTextColor="#999"
+                  value={unlockReason}
+                  onChangeText={setUnlockReason}
+                  multiline
+                  numberOfLines={3}
+                />
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalButtonCancel]}
+                    onPress={() => {
+                      setShowUnlockModal(false);
+                      setUnlockReason('');
+                    }}
+                  >
+                    <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalButtonSubmit]}
+                    onPress={handleRequestUnlock}
+                  >
+                    <Text style={styles.modalButtonTextSubmit}>Send Request</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Incoming Request Modal */}
@@ -826,45 +919,55 @@ export default function ActiveSession() {
         animationType="slide"
         onRequestClose={() => setShowEditGoalsModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.editGoalsModalContent}>
-            <View style={styles.editGoalsHeader}>
-              <Text style={styles.modalTitle}>Edit Goals</Text>
-              <TouchableOpacity onPress={() => setShowEditGoalsModal(false)}>
-                <Ionicons name="close" size={24} color="#000" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={styles.editGoalsList}>
-              {goalItems.map((goal) => (
-                <View key={goal.id} style={styles.editGoalRow}>
-                  <Text style={styles.editGoalText} numberOfLines={2}>{goal.goal_text || goal.text}</Text>
-                  <TouchableOpacity onPress={() => deleteGoal(goal.id)} style={styles.deleteGoalButton}>
-                    <Ionicons name="trash-outline" size={20} color="#B71C1C" />
+        <KeyboardAvoidingView 
+          style={styles.modalKeyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.editGoalsModalContent}>
+                <View style={styles.editGoalsHeader}>
+                  <Text style={styles.modalTitle}>Edit Goals</Text>
+                  <TouchableOpacity onPress={() => setShowEditGoalsModal(false)}>
+                    <Ionicons name="close" size={24} color="#000" />
                   </TouchableOpacity>
                 </View>
-              ))}
-              {goalItems.length === 0 && (
-                <Text style={styles.noGoalsText}>No goals yet. Add one below!</Text>
-              )}
-            </ScrollView>
+                
+                <ScrollView 
+                  style={styles.editGoalsList}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {goalItems.map((goal) => (
+                    <View key={goal.id} style={styles.editGoalRow}>
+                      <Text style={styles.editGoalText} numberOfLines={2}>{goal.goal_text || goal.text}</Text>
+                      <TouchableOpacity onPress={() => deleteGoal(goal.id)} style={styles.deleteGoalButton}>
+                        <Ionicons name="trash-outline" size={20} color="#B71C1C" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {goalItems.length === 0 && (
+                    <Text style={styles.noGoalsText}>No goals yet. Add one below!</Text>
+                  )}
+                </ScrollView>
 
-            <View style={styles.addGoalRow}>
-              <TextInput
-                style={styles.addGoalInput}
-                value={newGoalText}
-                onChangeText={setNewGoalText}
-                placeholder="New goal..."
-                placeholderTextColor="#999"
-                returnKeyType="done"
-                onSubmitEditing={addNewGoal}
-              />
-              <TouchableOpacity style={styles.addGoalButton} onPress={addNewGoal}>
-                <Ionicons name="add" size={24} color="#FFF" />
-              </TouchableOpacity>
+                <View style={styles.addGoalRow}>
+                  <TextInput
+                    style={styles.addGoalInput}
+                    value={newGoalText}
+                    onChangeText={setNewGoalText}
+                    placeholder="New goal..."
+                    placeholderTextColor="#999"
+                    returnKeyType="done"
+                    onSubmitEditing={addNewGoal}
+                  />
+                  <TouchableOpacity style={styles.addGoalButton} onPress={addNewGoal}>
+                    <Ionicons name="add" size={24} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -927,7 +1030,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   title: {
-    fontSize: 14,
+    fontSize: 20,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
   },
@@ -951,7 +1054,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
-    marginBottom: 20,
+    marginBottom: 5,
     textAlign: 'center',
   },
   subtitle: {
@@ -968,39 +1071,39 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   compactProgressLabel: {
-    fontSize: 11,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: 'rgba(255, 255, 255, 0.85)',
   },
   compactDotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   compactDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
   compactDotActive: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: '#FFD700',
   },
   compactNextText: {
-    fontSize: 11,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.75)',
     marginTop: 2,
   },
   timerLabel: {
-    fontSize: 12,
+    fontSize: 16,
     fontFamily: 'Poppins_700Bold',
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 30,
     letterSpacing: 1.5,
   },
   timerContainer: {
@@ -1028,7 +1131,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-    marginBottom: 24,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -1044,13 +1147,13 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   timerTotalLabel: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 2,
   },
   timerPhase: {
-    fontSize: 13,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 6,
@@ -1086,10 +1189,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 20,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
-    marginBottom: 12,
+    marginBottom: 2,
     letterSpacing: 0.5,
   },
   goalCard: {
@@ -1117,6 +1220,33 @@ const styles = StyleSheet.create({
   goalTextCompleted: {
     textDecorationLine: 'line-through',
     color: 'rgba(255, 255, 255, 0.5)',
+  },
+  userGoalsSection: {
+    marginBottom: 12,
+  },
+  userGoalsLabel: {
+    fontSize: 13,
+    fontFamily: 'Poppins_600SemiBold',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 4,
+  },
+  otherGoalsSection: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    paddingTop: 12,
+    marginTop: 4,
+  },
+  teammateGoals: {
+    marginBottom: 12,
+  },
+  teammateLabel: {
+    fontSize: 13,
+    fontFamily: 'Poppins_600SemiBold',
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 4,
+  },
+  teammateGoalText: {
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   participantsRow: {
     flexDirection: 'row',
@@ -1214,7 +1344,7 @@ const styles = StyleSheet.create({
   },
   exitButton: {
     flexDirection: 'row',
-    backgroundColor: '#B71C1C',
+    backgroundColor: '#7b2424ff',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
@@ -1228,6 +1358,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
+  },
+  modalKeyboardView: {
+    flex: 1,
   },
   modalOverlay: {
     flex: 1,

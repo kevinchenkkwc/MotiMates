@@ -1,8 +1,13 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, Keyboard, TouchableWithoutFeedback, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, Keyboard, TouchableWithoutFeedback, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { responsive } from '../../utils/responsive';
+
+const dismissKeyboard = () => {
+  Keyboard.dismiss();
+};
 
 export default function FocusGoals() {
   const router = useRouter();
@@ -59,24 +64,31 @@ export default function FocusGoals() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={styles.container}>
-        <ImageBackground
-          source={require('../../assets/background.png')}
-          style={styles.background}
-          resizeMode="cover"
+    <View style={styles.container}>
+      <ImageBackground
+        source={require('../../assets/background.png')}
+        style={styles.background}
+        resizeMode="cover"
+      >
+        <KeyboardAvoidingView 
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={responsive.keyboardVerticalOffset}
         >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={28} color="#FFF" />
-          </TouchableOpacity>
-        </View>
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <View style={styles.innerContainer}>
+              <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                  <Ionicons name="arrow-back" size={28} color="#FFF" />
+                </TouchableOpacity>
+              </View>
 
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={styles.contentInner}
-          keyboardShouldPersistTaps="handled"
-        >
+              <ScrollView
+                style={styles.content}
+                contentContainerStyle={styles.contentInner}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
           <Text style={styles.sessionName}>{sessionName}</Text>
           
           <View style={styles.titleContainer}>
@@ -110,17 +122,19 @@ export default function FocusGoals() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-            <Text style={styles.nextButtonText}>Next</Text>
-          </TouchableOpacity>
+                <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+                  <Text style={styles.nextButtonText}>Next</Text>
+                </TouchableOpacity>
 
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <Text style={styles.skipButtonText}>Skip for now</Text>
-          </TouchableOpacity>
-        </ScrollView>
+                <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+                  <Text style={styles.skipButtonText}>Skip for now</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </ImageBackground>
     </View>
-    </TouchableWithoutFeedback>
   );
 }
 
@@ -133,6 +147,12 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  innerContainer: {
+    flex: 1,
   },
   header: {
     paddingHorizontal: 20,
@@ -151,7 +171,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   sessionName: {
-    fontSize: 14,
+    fontSize: 22,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
     marginBottom: 24,
@@ -186,7 +206,7 @@ const styles = StyleSheet.create({
   },
   goalText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
   },
@@ -202,7 +222,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#000',
   },
@@ -213,7 +233,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   addButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
   },
@@ -233,7 +253,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   skipButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.85)',
   },

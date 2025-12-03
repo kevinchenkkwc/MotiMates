@@ -178,13 +178,13 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   caption: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
     marginBottom: 4,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: 20,
@@ -202,12 +202,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
   },
   value: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
   },
@@ -221,12 +221,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   pomodoroTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
   },
   pomodoroText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#333',
   },
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   goalsText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#333',
   },
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   appChipText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#FFF',
   },
@@ -265,12 +265,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEE',
   },
   appChipTextMuted: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
   },
   readyText: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
     marginBottom: 12,
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   startButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
   },

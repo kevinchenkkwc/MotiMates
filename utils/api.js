@@ -163,6 +163,25 @@ export async function createActiveSession({
 
   if (error) throw error;
 
+  // Add host as a participant so RLS policies work correctly
+  // (guests need to see host's goals, which requires host to be in session_participants)
+  const { error: participantError } = await supabase
+    .from('session_participants')
+    .upsert(
+      {
+        session_id: data.id,
+        user_id: hostId,
+        status: 'joined',
+        joined_at: now,
+      },
+      { onConflict: 'session_id,user_id' }
+    );
+
+  if (participantError) {
+    console.error('Failed to add host as participant:', participantError);
+    // Don't throw - session was created successfully
+  }
+
   return data;
 }
 
@@ -232,7 +251,15 @@ export async function listHostedSessions() {
 
 export async function listActiveHostedSessions() {
   const sessions = await listHostedSessions();
-  return sessions.filter((s) => s.status === 'active');
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  
+  return sessions.filter((s) => {
+    // Include in_progress sessions
+    if (s.status === 'in_progress') return true;
+    // Include active sessions that are less than 10 minutes old
+    if (s.status === 'active') return s.created_at > tenMinutesAgo;
+    return false;
+  });
 }
 
 // List all public active/in-progress sessions (for browse/join)
@@ -259,6 +286,35 @@ export async function listPublicActiveSessions() {
     .limit(20);
 
   if (error) throw error;
+  
+  // Filter out sessions that haven't started within 10 minutes
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const validSessions = (data || []).filter(session => {
+    // If session is in_progress, it's valid
+    if (session.status === 'in_progress') return true;
+    // If session is 'active' (waiting to start), check if it's less than 10 minutes old
+    return session.created_at > tenMinutesAgo;
+  });
+  
+  return validSessions;
+}
+
+// Clean up expired sessions (sessions that haven't started within 10 minutes)
+export async function cleanupExpiredSessions() {
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  
+  const { data, error } = await supabase
+    .from('sessions')
+    .update({ status: 'expired' })
+    .eq('status', 'active')
+    .lt('created_at', tenMinutesAgo)
+    .select('id');
+
+  if (error) {
+    console.error('Failed to cleanup expired sessions:', error);
+    return [];
+  }
+  
   return data || [];
 }
 
@@ -344,11 +400,13 @@ export async function endSession(sessionId) {
     })
     .eq('id', sessionId)
     .eq('host_id', user.id)
-    .select('*')
-    .single();
+    .select('*');
 
+  // Don't throw error if no rows updated (user is not the host)
   if (error) throw error;
-  return data;
+  
+  // Return the first result or null if user wasn't the host
+  return data && data.length > 0 ? data[0] : null;
 }
 
 export async function updateParticipantReady(sessionId, isReady) {
@@ -426,6 +484,22 @@ export async function getFocusGoals(sessionId, userId = null) {
   }
 
   const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+// Get all goals for all participants in a session (for displaying in active session)
+export async function getAllSessionGoals(sessionId) {
+  const { data, error } = await supabase
+    .from('focus_goals')
+    .select(`
+      *,
+      profiles:user_id (
+        display_name
+      )
+    `)
+    .eq('session_id', sessionId);
+
   if (error) throw error;
   return data || [];
 }

@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 30,
     justifyContent: 'center',
-    paddingBottom: 60,
+    paddingBottom: 80,
   },
   card: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -109,14 +109,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 20,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     marginBottom: 32,
     textAlign: 'center',
   },
   label: {
-    fontSize: 14,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
     marginBottom: 12,
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   shareButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFF',
   },

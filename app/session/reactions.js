@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   },
   notificationText: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
   },
 });

@@ -1,9 +1,13 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ScrollView, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ScrollView, Modal, TextInput, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { responsive } from '../../utils/responsive';
+
+const dismissKeyboard = () => {
+  Keyboard.dismiss();
+};
 
 export default function BlockedApps() {
   const router = useRouter();
@@ -94,35 +98,42 @@ export default function BlockedApps() {
         </ScrollView>
 
         <Modal transparent visible={showAddModal} animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalBox}>
-              <Text style={styles.modalTitle}>Add Blocked App</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newAppName}
-                onChangeText={setNewAppName}
-                placeholder="App name (e.g., Twitter, Facebook)"
-                placeholderTextColor="#999"
-                returnKeyType="done"
-                onSubmitEditing={handleAddApp}
-                autoFocus
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={styles.modalCancelButton}
-                  onPress={() => {
-                    setShowAddModal(false);
-                    setNewAppName('');
-                  }}
-                >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalAddButton} onPress={handleAddApp}>
-                  <Text style={styles.modalAddText}>Add</Text>
-                </TouchableOpacity>
+          <KeyboardAvoidingView 
+            style={styles.modalKeyboardView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <TouchableWithoutFeedback onPress={dismissKeyboard}>
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalBox}>
+                  <Text style={styles.modalTitle}>Add Blocked App</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={newAppName}
+                    onChangeText={setNewAppName}
+                    placeholder="App name (e.g., Twitter, Facebook)"
+                    placeholderTextColor="#999"
+                    returnKeyType="done"
+                    onSubmitEditing={handleAddApp}
+                    autoFocus
+                  />
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={styles.modalCancelButton}
+                      onPress={() => {
+                        setShowAddModal(false);
+                        setNewAppName('');
+                      }}
+                    >
+                      <Text style={styles.modalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.modalAddButton} onPress={handleAddApp}>
+                      <Text style={styles.modalAddText}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
-            </View>
-          </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
         </Modal>
       </ImageBackground>
     </View>
@@ -151,7 +162,7 @@ const styles = StyleSheet.create({
     width: 28,
   },
   headerTitle: {
-    fontSize: responsive.fontSize.xxl,
+    fontSize: 26,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
   },
@@ -160,7 +171,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   subtitle: {
-    fontSize: responsive.fontSize.md,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 20,
@@ -195,7 +206,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   appName: {
-    fontSize: responsive.fontSize.lg,
+    fontSize: 18,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
   },
@@ -214,7 +225,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   addButtonText: {
-    fontSize: responsive.fontSize.lg,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
   },
@@ -229,10 +240,13 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
-    fontSize: responsive.fontSize.sm,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
     lineHeight: responsive.fontSize.sm * 1.4,
+  },
+  modalKeyboardView: {
+    flex: 1,
   },
   modalOverlay: {
     flex: 1,
@@ -248,7 +262,7 @@ const styles = StyleSheet.create({
     maxWidth: 340,
   },
   modalTitle: {
-    fontSize: responsive.fontSize.xl,
+    fontSize: 20,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
     marginBottom: 16,
@@ -258,7 +272,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: responsive.padding.md,
     paddingVertical: responsive.padding.sm,
-    fontSize: responsive.fontSize.md,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#000',
     marginBottom: 20,
@@ -275,7 +289,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCancelText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#666',
   },
@@ -287,7 +301,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalAddText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
   },

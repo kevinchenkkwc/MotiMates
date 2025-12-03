@@ -1,10 +1,13 @@
-import { Dimensions, PixelRatio } from 'react-native';
+import { Dimensions, PixelRatio, Platform } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Base dimensions (iPhone 14 Pro)
-const BASE_WIDTH = 393;
-const BASE_HEIGHT = 852;
+// Base dimensions (iPhone 15 Pro Max)
+const BASE_WIDTH = 430;
+const BASE_HEIGHT = 932;
+
+// Get font scale for accessibility
+const fontScale = PixelRatio.getFontScale();
 
 // Device type detection
 export const isTablet = () => {
@@ -21,6 +24,19 @@ export const isTablet = () => {
 
 export const isSmallDevice = () => {
   return SCREEN_WIDTH < 375;
+};
+
+export const isMediumDevice = () => {
+  return SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
+};
+
+export const isLargeDevice = () => {
+  return SCREEN_WIDTH >= 414;
+};
+
+// Check if user has increased text size in accessibility settings
+export const hasLargeTextEnabled = () => {
+  return fontScale > 1.0;
 };
 
 // Scale functions
@@ -42,13 +58,29 @@ export const scaleHeight = (size) => {
 };
 
 export const scaleFontSize = (size) => {
+  // Calculate scale factor based on screen width relative to base
+  const widthScale = SCREEN_WIDTH / BASE_WIDTH;
+  
   if (isTablet()) {
     // Slightly larger fonts on tablets but not proportional
     return size * 1.2;
   } else if (isSmallDevice()) {
-    return size * 0.95;
+    // Scale down for small devices (iPhone SE, etc.)
+    return Math.max(size * 0.85, size * widthScale);
+  } else if (isMediumDevice()) {
+    // Slight scale for medium devices
+    return size * Math.max(0.92, widthScale);
   }
+  // For large devices (iPhone 15 Pro Max is base), keep size as-is
   return size;
+};
+
+// Scale font size while respecting accessibility settings
+export const scaleAccessibleFontSize = (size) => {
+  const baseSize = scaleFontSize(size);
+  // Cap the font scale to prevent text from becoming too large
+  const cappedFontScale = Math.min(fontScale, 1.35);
+  return baseSize * cappedFontScale;
 };
 
 export const scaleModerate = (size, factor = 0.5) => {
@@ -65,8 +97,11 @@ export const responsive = {
   screenHeight: SCREEN_HEIGHT,
   isTablet: isTablet(),
   isSmallDevice: isSmallDevice(),
+  isMediumDevice: isMediumDevice(),
+  isLargeDevice: isLargeDevice(),
+  fontScale: fontScale,
   
-  // Padding and margins
+  // Padding and margins - scale based on screen width
   padding: {
     xs: scaleWidth(4),
     sm: scaleWidth(8),
@@ -75,7 +110,7 @@ export const responsive = {
     xl: scaleWidth(32),
   },
   
-  // Font sizes
+  // Font sizes - these are base sizes for iPhone 15 Pro Max
   fontSize: {
     xs: scaleFontSize(11),
     sm: scaleFontSize(13),
@@ -104,6 +139,12 @@ export const responsive = {
   // Layout helpers
   maxWidth: isTablet() ? 700 : SCREEN_WIDTH,
   contentPadding: isTablet() ? scaleWidth(40) : scaleWidth(20),
+  
+  // Safe area helpers
+  headerPaddingTop: Platform.OS === 'ios' ? scaleHeight(60) : scaleHeight(40),
+  
+  // Keyboard behavior
+  keyboardVerticalOffset: Platform.OS === 'ios' ? 0 : 20,
 };
 
 // Helper to create responsive stylesheets

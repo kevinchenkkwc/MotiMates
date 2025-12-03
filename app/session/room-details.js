@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView, TextInput, Alert, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { getSessionWithParticipants, joinSessionById, getFocusGoals, saveFocusGoals, getCurrentUser } from '../../utils/api';
@@ -6,12 +6,16 @@ import { supabase } from '../../utils/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { responsive } from '../../utils/responsive';
 
+const dismissKeyboard = () => {
+  Keyboard.dismiss();
+};
+
 export default function RoomDetails() {
   const router = useRouter();
   const { sessionId } = useLocalSearchParams();
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
-  const [goals, setGoals] = useState(['', '']);
+  const [goals, setGoals] = useState(['']);
   const [joining, setJoining] = useState(false);
 
   useEffect(() => {
@@ -153,14 +157,26 @@ export default function RoomDetails() {
         style={styles.background}
         resizeMode="cover"
       >
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#FFF" />
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={responsive.keyboardVerticalOffset}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <View style={styles.innerContainer}>
+              <View style={styles.header}>
+                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                  <Ionicons name="chevron-back" size={24} color="#FFF" />
+                  <Text style={styles.backText}>Back</Text>
+                </TouchableOpacity>
+              </View>
 
-        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+              <ScrollView 
+                style={styles.content} 
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
           <Text style={styles.title}>Room #{session?.invite_code}</Text>
           <Text style={styles.roomName}>{session?.name || 'Untitled Session'}</Text>
 
@@ -222,10 +238,10 @@ export default function RoomDetails() {
               <View key={index} style={styles.goalInputRow}>
                 <Ionicons name="square-outline" size={20} color="#666" style={styles.goalIcon} />
                 <TextInput
-                  style={styles.goalInput}
+                  style={[styles.goalInput, { fontStyle: "italic" }]}
                   value={goal}
                   onChangeText={(text) => updateGoal(index, text)}
-                  placeholder={index === 0 ? 'finish math 51 pset' : index === 1 ? 'prepare for quant interviews' : 'add goal'}
+                  placeholder="enter goal"
                   placeholderTextColor="#999"
                   returnKeyType="next"
                 />
@@ -257,8 +273,11 @@ export default function RoomDetails() {
             )}
           </TouchableOpacity>
 
-          <View style={{ height: 40 }} />
-        </ScrollView>
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </ImageBackground>
     </View>
   );
@@ -274,6 +293,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  keyboardView: {
+    flex: 1,
+  },
+  innerContainer: {
+    flex: 1,
+  },
   header: {
     paddingHorizontal: responsive.contentPadding,
     paddingTop: 60,
@@ -284,7 +309,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backText: {
-    fontSize: responsive.fontSize.md,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
     marginLeft: 4,
@@ -302,13 +327,13 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   title: {
-    fontSize: responsive.fontSize.xxl,
+    fontSize: 26,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: 4,
   },
   roomName: {
-    fontSize: responsive.fontSize.xl,
+    fontSize: 22,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
     marginBottom: 20,
@@ -324,7 +349,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   timeLabel: {
-    fontSize: responsive.fontSize.md,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
     marginBottom: 4,
@@ -335,12 +360,12 @@ const styles = StyleSheet.create({
     color: '#8B1E1E',
   },
   roomType: {
-    fontSize: responsive.fontSize.sm,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
   },
   cardTitle: {
-    fontSize: responsive.fontSize.md,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
     marginBottom: 12,
@@ -369,7 +394,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   hostName: {
-    fontSize: responsive.fontSize.lg,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
     marginRight: 8,
@@ -407,7 +432,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   participantName: {
-    fontSize: responsive.fontSize.md,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
     marginRight: 8,
@@ -427,7 +452,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   goalsTitle: {
-    fontSize: responsive.fontSize.lg,
+    fontSize: 20,
     fontFamily: 'Poppins_700Bold',
     color: '#FFF',
   },
@@ -442,7 +467,7 @@ const styles = StyleSheet.create({
   },
   goalInput: {
     flex: 1,
-    fontSize: responsive.fontSize.md,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#FFF',
     paddingVertical: 8,
@@ -453,7 +478,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   addGoalText: {
-    fontSize: responsive.fontSize.sm,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.7)',
     marginLeft: 4,
@@ -468,7 +493,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   joinButtonText: {
-    fontSize: responsive.fontSize.lg,
+    fontSize: 18,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
   },

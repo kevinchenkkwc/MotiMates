@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     width: 28,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 26,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
   },
@@ -97,19 +97,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
     marginBottom: 4,
   },
   cardMeta: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     marginBottom: 8,
   },
   cardBody: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#000',
   },

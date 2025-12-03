@@ -1,6 +1,11 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, Modal } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, Modal, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { responsive } from '../../utils/responsive';
+
+const dismissKeyboard = () => {
+  Keyboard.dismiss();
+};
 
 export default function Host() {
   const router = useRouter();
@@ -27,11 +32,18 @@ export default function Host() {
         style={styles.background}
         resizeMode="cover"
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Host a session</Text>
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={responsive.keyboardVerticalOffset}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <View style={styles.innerContainer}>
+              <View style={styles.header}>
+                <Text style={styles.headerTitle}>Host a session</Text>
+              </View>
 
-        <View style={styles.content}>
+              <View style={styles.content}>
           <Text style={styles.label}>Name your session</Text>
           <TextInput
             style={styles.input}
@@ -60,10 +72,13 @@ export default function Host() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-            <Text style={styles.nextButtonText}>Next</Text>
-          </TouchableOpacity>
-        </View>
+                  <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+                  <Text style={styles.nextButtonText}>Next</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
 
         <Modal transparent visible={showError} animationType="fade">
           <View style={styles.modalOverlay}>
@@ -87,6 +102,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  keyboardView: {
+    flex: 1,
+  },
+  innerContainer: {
+    flex: 1,
+  },
   header: {
     paddingHorizontal: 20,
     paddingTop: 60,
@@ -94,14 +115,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 28,
+    marginTop: 20,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 30,
-    paddingTop: 40,
+    paddingHorizontal: 34,
+    paddingTop: 20,
     paddingBottom: 120,
   },
   label: {

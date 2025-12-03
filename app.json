@@ -11,7 +11,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.motimates.app"
+      "bundleIdentifier": "com.motimates.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.motimates.app"
@@ -22,7 +25,16 @@
     ],
     "scheme": "motimates",
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "2ebe6f50-f222-4c01-94fe-d7d20a6adc21"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2ebe6f50-f222-4c01-94fe-d7d20a6adc21"
     }
   }
 }

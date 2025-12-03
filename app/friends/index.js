@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, ImageBackground, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { responsive } from '../../utils/responsive';
 
 export default function FriendsScreen() {
@@ -8,7 +9,7 @@ export default function FriendsScreen() {
   const friends = [
     { name: 'Derek Bao', status: 'Online', color: '#90EE90' },
     { name: 'Kevin Chen', status: 'In Session', color: '#FFD700' },
-    { name: 'Austin Konig', status: 'Offline', color: '#D3D3D3' },
+    { name: 'Adam Sun', status: 'Offline', color: '#D3D3D3' },
   ];
 
   return (
@@ -19,6 +20,12 @@ export default function FriendsScreen() {
         resizeMode="cover"
       >
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.headerBackButton} onPress={() => router.back()}>
+              <Ionicons name="chevron-back" size={24} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+
           <Text style={styles.title}>Your MotiMates</Text>
           <Text style={styles.subtitle}>Wizard-of-oz friends list for demo</Text>
 
@@ -38,10 +45,6 @@ export default function FriendsScreen() {
               </View>
             ))}
           </View>
-
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>Back to Home</Text>
-          </TouchableOpacity>
         </ScrollView>
       </ImageBackground>
     </View>
@@ -63,11 +66,19 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     maxWidth: responsive.maxWidth,
-    paddingTop: 60,
+    paddingTop: 0,
   },
   scrollContent: {
     paddingHorizontal: responsive.contentPadding,
     paddingBottom: responsive.padding.xl,
+  },
+  header: {
+    paddingHorizontal: responsive.contentPadding,
+    paddingTop: 60,
+    paddingBottom: responsive.padding.sm,
+  },
+  headerBackButton: {
+    width: 40,
   },
   title: {
     fontSize: responsive.fontSize.xxxl,
@@ -128,19 +139,5 @@ const styles = StyleSheet.create({
     fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
-  },
-  backButton: {
-    marginTop: responsive.padding.lg,
-    alignSelf: 'center',
-    paddingVertical: responsive.padding.sm,
-    paddingHorizontal: responsive.padding.lg,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.8)',
-  },
-  backButtonText: {
-    fontSize: responsive.fontSize.md,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#FFFFFF',
   },
 });

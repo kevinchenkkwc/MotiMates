@@ -1,8 +1,12 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, Keyboard, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, Keyboard, Modal, Dimensions, KeyboardAvoidingView, TouchableWithoutFeedback, Platform, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { responsive } from '../../utils/responsive';
+
+const dismissKeyboard = () => {
+  Keyboard.dismiss();
+};
 
 export default function SetTimer() {
   const router = useRouter();
@@ -75,13 +79,25 @@ export default function SetTimer() {
         style={styles.background}
         resizeMode="cover"
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={28} color="#FFF" />
-          </TouchableOpacity>
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={responsive.keyboardVerticalOffset}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <ScrollView 
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                  <Ionicons name="arrow-back" size={28} color="#FFF" />
+                </TouchableOpacity>
+              </View>
 
-        <View style={styles.content}>
+              <View style={styles.content}>
           <Text style={styles.sectionTitle}>HOST A SESSION</Text>
           <TouchableOpacity onPress={() => router.back()} style={styles.backLink}>
             <Ionicons name="chevron-back" size={20} color="#FFF" />
@@ -217,11 +233,14 @@ export default function SetTimer() {
               </View>
             )}
 
-            <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-              <Text style={styles.nextButtonText}>Next ›</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+                <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+                  <Text style={styles.nextButtonText}>Next ›</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
 
         <Modal transparent visible={showError} animationType="fade">
           <View style={styles.modalOverlay}>
@@ -244,6 +263,15 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   header: {
     paddingHorizontal: 20,
@@ -302,7 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   modeTabText: {
-    fontSize: 13,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.9)',
   },
@@ -310,7 +338,7 @@ const styles = StyleSheet.create({
     color: '#8B1E1E',
   },
   modeCaption: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.85)',
     marginBottom: 16,
@@ -328,13 +356,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   timerLabel: {
-    fontSize: responsive.fontSize.md,
+    fontSize: responsive.fontSize.xl,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
     marginBottom: 4,
   },
   timerHelper: {
-    fontSize: responsive.fontSize.xs,
+    fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 8,
@@ -387,7 +415,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   toggleDescription: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
     textAlign: 'center',

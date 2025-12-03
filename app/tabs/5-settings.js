@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ScrollView, Alert } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useRouter } from 'expo-router';
 import { signOut } from '../../utils/api';
+import { supabase } from '../../utils/supabase';
 
 export default function Settings() {
   const router = useRouter();
@@ -15,6 +16,61 @@ export default function Settings() {
     } finally {
       router.replace('/auth/login');
     }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (!user) {
+                Alert.alert('Error', 'No user found');
+                return;
+              }
+
+              const userId = user.id;
+
+              // Delete user's data from all related tables (order matters for foreign keys)
+              // 1. Delete unlock votes by this user
+              await supabase.from('unlock_votes').delete().eq('voter_id', userId);
+              
+              // 2. Delete unlock requests by this user
+              await supabase.from('unlock_requests').delete().eq('requester_id', userId);
+              
+              // 3. Delete focus goals by this user
+              await supabase.from('focus_goals').delete().eq('user_id', userId);
+              
+              // 4. Delete reflections by this user
+              await supabase.from('reflections').delete().eq('user_id', userId);
+              
+              // 5. Delete session participations
+              await supabase.from('session_participants').delete().eq('user_id', userId);
+              
+              // 6. Delete sessions hosted by this user
+              await supabase.from('sessions').delete().eq('host_id', userId);
+              
+              // 7. Delete user profile
+              await supabase.from('profiles').delete().eq('id', userId);
+
+              // 8. Sign out and redirect
+              await signOut();
+              
+              router.replace('/auth/login');
+            } catch (e) {
+              console.error('Failed to delete account:', e);
+              Alert.alert('Error', 'Failed to delete account. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const SettingItem = ({ icon, label, value, onPress }) => (
@@ -51,6 +107,11 @@ export default function Settings() {
                 icon={<Ionicons name="log-out-outline" size={20} color="#000" />}
                 label="Log Out"
                 onPress={handleLogout}
+              />
+              <SettingItem
+                icon={<Ionicons name="trash-outline" size={20} color="#B71C1C" />}
+                label="Delete Account"
+                onPress={handleDeleteAccount}
               />
             </View>
           </View>
@@ -95,13 +156,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   section: {
     marginBottom: 24,

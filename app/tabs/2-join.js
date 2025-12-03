@@ -1,10 +1,14 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView, TextInput, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView, TextInput, Modal, Alert, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
-import { listPublicActiveSessions, getSessionByInviteCode, joinSessionById } from '../../utils/api';
+import { listPublicActiveSessions, getSessionByInviteCode, joinSessionById, cleanupExpiredSessions } from '../../utils/api';
 import { supabase } from '../../utils/supabase';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { responsive } from '../../utils/responsive';
+
+const dismissKeyboard = () => {
+  Keyboard.dismiss();
+};
 
 export default function Join() {
   const router = useRouter();
@@ -44,6 +48,9 @@ export default function Join() {
 
   const loadActiveSessions = async () => {
     try {
+      // Clean up expired sessions first (sessions that haven't started in 10 minutes)
+      await cleanupExpiredSessions();
+      
       const data = await listPublicActiveSessions();
       // Filter out ended sessions and sessions with 0 time remaining
       const now = Date.now();
@@ -163,7 +170,7 @@ export default function Join() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Active Sessions</Text>
           <TouchableOpacity style={styles.codeButtonHeader} onPress={() => setShowCodeModal(true)}>
-            <Text style={styles.codeButtonText}>Enter Invite Code</Text>
+            <Text style={styles.codeButtonText}>Invite Code</Text>
           </TouchableOpacity>
         </View>
 
@@ -239,54 +246,61 @@ export default function Join() {
           animationType="slide"
           onRequestClose={() => setShowCodeModal(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => {
-                  setShowCodeModal(false);
-                  setInviteCode('');
-                  setCodeError('');
-                }}
-              >
-                <Ionicons name="close" size={24} color="#000" />
-              </TouchableOpacity>
+          <KeyboardAvoidingView 
+            style={styles.modalKeyboardView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <TouchableWithoutFeedback onPress={dismissKeyboard}>
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => {
+                      setShowCodeModal(false);
+                      setInviteCode('');
+                      setCodeError('');
+                    }}
+                  >
+                    <Ionicons name="close" size={24} color="#000" />
+                  </TouchableOpacity>
 
-              <Ionicons name="enter-outline" size={48} color="#8B1E1E" style={styles.modalIcon} />
-              <Text style={styles.modalTitle}>Enter Invite Code</Text>
-              <Text style={styles.modalSubtitle}>Ask your mate for their session code</Text>
+                  <Ionicons name="enter-outline" size={48} color="#8B1E1E" style={styles.modalIcon} />
+                  <Text style={styles.modalTitle}>Enter Invite Code</Text>
+                  <Text style={styles.modalSubtitle}>Ask your mate for their session code</Text>
 
-              <TextInput
-                style={styles.codeInput}
-                value={inviteCode}
-                onChangeText={(text) => {
-                  setInviteCode(text.toUpperCase());
-                  setCodeError('');
-                }}
-                placeholder="ABC123"
-                placeholderTextColor="#999"
-                autoCapitalize="characters"
-                autoCorrect={false}
-                maxLength={8}
-                returnKeyType="join"
-                onSubmitEditing={handleJoinByCode}
-              />
+                  <TextInput
+                    style={styles.codeInput}
+                    value={inviteCode}
+                    onChangeText={(text) => {
+                      setInviteCode(text.toUpperCase());
+                      setCodeError('');
+                    }}
+                    placeholder="ABC123"
+                    placeholderTextColor="#999"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={8}
+                    returnKeyType="join"
+                    onSubmitEditing={handleJoinByCode}
+                  />
 
-              {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
+                  {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
 
-              <TouchableOpacity
-                style={[styles.joinButton, joiningCode && styles.joinButtonDisabled]}
-                onPress={handleJoinByCode}
-                disabled={joiningCode}
-              >
-                {joiningCode ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <Text style={styles.joinButtonText}>Join Session</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
+                  <TouchableOpacity
+                    style={[styles.joinButton, joiningCode && styles.joinButtonDisabled]}
+                    onPress={handleJoinByCode}
+                    disabled={joiningCode}
+                  >
+                    {joiningCode ? (
+                      <ActivityIndicator color="#FFF" />
+                    ) : (
+                      <Text style={styles.joinButtonText}>Join Session</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
         </Modal>
       </ImageBackground>
     </View>
@@ -304,15 +318,15 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   header: {
-    paddingHorizontal: responsive.contentPadding,
-    paddingTop: 60,
+    paddingHorizontal: 34,
+    paddingTop: 80,
     paddingBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: responsive.fontSize.xxl,
+    fontSize: 28,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
   },
@@ -320,7 +334,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 8,
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+    marginRight: -10,
   },
   codeButtonText: {
     fontSize: responsive.fontSize.sm,
@@ -331,11 +346,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: responsive.contentPadding,
+    paddingHorizontal: 32,
     paddingBottom: 40,
+    paddingTop: 8,
   },
   sectionTitle: {
-    fontSize: responsive.fontSize.xl,
+    fontSize: 24,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: 20,
@@ -415,6 +431,9 @@ const styles = StyleSheet.create({
     fontSize: responsive.fontSize.sm,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
+  },
+  modalKeyboardView: {
+    flex: 1,
   },
   modalOverlay: {
     flex: 1,

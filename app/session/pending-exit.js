@@ -3,16 +3,16 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 
 export default function PendingExit() {
   const router = useRouter();
-  const { sessionName, totalMinutes, goals, reason } = useLocalSearchParams();
+  const { sessionId, sessionName, totalMinutes, goals, reason } = useLocalSearchParams();
 
   const handleApprove = () => {
     router.push({
       pathname: '/session/summary',
       params: {
+        sessionId,
         sessionName,
         totalMinutes,
         endedEarly: 'true',
-        goals,
       },
     });
   };
@@ -21,9 +21,9 @@ export default function PendingExit() {
     router.push({
       pathname: '/session/active',
       params: {
+        sessionId,
         sessionName,
         totalMinutes,
-        goals,
         exitDeclined: 'true',
       },
     });
@@ -78,13 +78,13 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
     marginBottom: 24,
@@ -96,13 +96,13 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   reasonLabel: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_600SemiBold',
     color: '#666',
     marginBottom: 4,
   },
   reasonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#000',
   },
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   devButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
   },

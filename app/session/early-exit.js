@@ -1,10 +1,14 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, TextInput, ScrollView, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { supabase } from '../../utils/supabase';
 import { leaveSession } from '../../utils/api';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { responsive } from '../../utils/responsive';
+
+const dismissKeyboard = () => {
+  Keyboard.dismiss();
+};
 
 export default function EarlyExit() {
   const router = useRouter();
@@ -133,50 +137,63 @@ export default function EarlyExit() {
         style={styles.background}
         resizeMode="cover"
       >
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            <Ionicons name="exit-outline" size={64} color="#FFB84D" />
-            <Text style={styles.title}>Early Exit</Text>
-            <Text style={styles.sessionName}>{sessionName || 'Study Session'}</Text>
-          </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={responsive.keyboardVerticalOffset}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <ScrollView 
+              style={styles.scrollView} 
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.header}>
+                <Ionicons name="exit-outline" size={64} color="#FFB84D" />
+                <Text style={styles.title}>Early Exit</Text>
+                <Text style={styles.sessionName}>{sessionName || 'Study Session'}</Text>
+              </View>
 
-          <View style={styles.reasonCard}>
-            <Text style={styles.reasonLabel}>Exit Reason:</Text>
-            <Text style={styles.reasonText}>{reason}</Text>
-          </View>
+              <View style={styles.reasonCard}>
+                <Text style={styles.reasonLabel}>Exit Reason:</Text>
+                <Text style={styles.reasonText}>{reason}</Text>
+              </View>
 
-          <View style={styles.reflectionSection}>
-            <Text style={styles.sectionTitle}>Quick Reflection</Text>
-            <Text style={styles.sectionSubtitle}>
-              How did this session go? What could you improve next time?
-            </Text>
-            <TextInput
-              style={styles.reflectionInput}
-              placeholder="I felt productive because..."
-              placeholderTextColor="#999"
-              value={reflection}
-              onChangeText={setReflection}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-          </View>
+              <View style={styles.reflectionSection}>
+                <Text style={styles.sectionTitle}>Quick Reflection</Text>
+                <Text style={styles.sectionSubtitle}>
+                  How did this session go? What could you improve next time?
+                </Text>
+                <TextInput
+                  style={styles.reflectionInput}
+                  placeholder="I felt productive because..."
+                  placeholderTextColor="#999"
+                  value={reflection}
+                  onChangeText={setReflection}
+                  multiline
+                  numberOfLines={6}
+                  textAlignVertical="top"
+                />
+              </View>
 
-          <View style={styles.motivationalBox}>
-            <Ionicons name="bulb-outline" size={24} color="#FFB84D" style={styles.bulbIcon} />
-            <Text style={styles.motivationalText}>
-              Life happens! The important thing is getting back to it. Your study mates are still locked in. 💪
-            </Text>
-          </View>
+              <View style={styles.motivationalBox}>
+                <Ionicons name="bulb-outline" size={24} color="#FFB84D" style={styles.bulbIcon} />
+                <Text style={styles.motivationalText}>
+                  Life happens! The important thing is getting back to it. Your study mates are still locked in. 💪
+                </Text>
+              </View>
 
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitButtonText}>Submit Reflection</Text>
-          </TouchableOpacity>
+              <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+                <Text style={styles.submitButtonText}>Submit Reflection</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <Text style={styles.skipButtonText}>Skip for now</Text>
-          </TouchableOpacity>
-        </ScrollView>
+              <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+                <Text style={styles.skipButtonText}>Skip for now</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </ImageBackground>
     </View>
   );
@@ -191,6 +208,9 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+  },
+  keyboardView: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -212,7 +232,7 @@ const styles = StyleSheet.create({
     marginBottom: responsive.padding.xs,
   },
   sessionName: {
-    fontSize: responsive.fontSize.lg,
+    fontSize: 20,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.8)',
   },
@@ -225,13 +245,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   reasonLabel: {
-    fontSize: responsive.fontSize.md,
+    fontSize: 18,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: responsive.padding.xs,
   },
   reasonText: {
-    fontSize: responsive.fontSize.lg,
+    fontSize: 18,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
   },
@@ -239,13 +259,13 @@ const styles = StyleSheet.create({
     marginBottom: responsive.padding.lg,
   },
   sectionTitle: {
-    fontSize: responsive.fontSize.xl,
+    fontSize: 22,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: responsive.padding.xs,
   },
   sectionSubtitle: {
-    fontSize: responsive.fontSize.md,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: responsive.padding.md,
@@ -254,7 +274,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 16,
     padding: responsive.padding.md,
-    fontSize: responsive.fontSize.md,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#000',
     minHeight: 140,
@@ -273,7 +293,7 @@ const styles = StyleSheet.create({
   },
   motivationalText: {
     flex: 1,
-    fontSize: responsive.fontSize.md,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
     lineHeight: 22,
@@ -286,7 +306,7 @@ const styles = StyleSheet.create({
     marginBottom: responsive.padding.sm,
   },
   submitButtonText: {
-    fontSize: responsive.fontSize.lg,
+    fontSize: 18,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
   },
@@ -297,7 +317,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   skipButtonText: {
-    fontSize: responsive.fontSize.md,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: 'rgba(255, 255, 255, 0.7)',
   },
@@ -315,7 +335,7 @@ const styles = StyleSheet.create({
     marginBottom: responsive.padding.xs,
   },
   successSubtitle: {
-    fontSize: responsive.fontSize.lg,
+    fontSize: 18,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',

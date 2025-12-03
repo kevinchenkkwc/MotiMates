@@ -1,11 +1,12 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, Modal } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ImageBackground, Modal, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, ScrollView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { responsive } from '../../utils/responsive';
 
 export default function RequestExit() {
   const router = useRouter();
-  const { sessionName, totalMinutes, goals } = useLocalSearchParams();
+  const { sessionId, sessionName, totalMinutes } = useLocalSearchParams();
   const [reason, setReason] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -18,12 +19,16 @@ export default function RequestExit() {
     router.push({
       pathname: '/session/pending-exit',
       params: {
+        sessionId,
         sessionName,
         totalMinutes,
-        goals,
         reason,
       },
     });
+  };
+
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
   };
 
   return (
@@ -33,39 +38,56 @@ export default function RequestExit() {
         style={styles.background}
         resizeMode="cover"
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={28} color="#FFF" />
-          </TouchableOpacity>
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={responsive.keyboardVerticalOffset}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <ScrollView 
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                  <Ionicons name="arrow-back" size={28} color="#FFF" />
+                </TouchableOpacity>
+              </View>
 
-        <View style={styles.content}>
-          <Text style={styles.title}>End Request</Text>
+              <View style={styles.content}>
+                <Text style={styles.title}>End Request</Text>
 
-          <View style={styles.warningBox}>
-            <Text style={styles.warningText}>
-              If approved, your session will end early and you'll leave this room.
-            </Text>
-          </View>
+                <View style={styles.warningBox}>
+                  <Text style={styles.warningText}>
+                    If approved, your session will end early and you'll leave this room.
+                  </Text>
+                </View>
 
-          <Text style={styles.label}>Reason</Text>
-          <TextInput
-            style={styles.textArea}
-            value={reason}
-            onChangeText={setReason}
-            placeholder="Type reason here for your mates to review..."
-            placeholderTextColor="#999"
-            multiline
-            numberOfLines={5}
-            textAlignVertical="top"
-            returnKeyType="done"
-            blurOnSubmit={true}
-          />
+                <Text style={styles.label}>Reason</Text>
+                <TextInput
+                  style={styles.textArea}
+                  value={reason}
+                  onChangeText={setReason}
+                  placeholder="Type reason here for your mates to review..."
+                  placeholderTextColor="#999"
+                  multiline
+                  numberOfLines={5}
+                  textAlignVertical="top"
+                />
 
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitButtonText}>Submit Request</Text>
-          </TouchableOpacity>
-        </View>
+                <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+                  <Text style={styles.submitButtonText}>Submit Request</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.cancelLink} onPress={() => router.back()}>
+                  <Text style={styles.cancelLinkText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
 
         <Modal transparent visible={showConfirm} animationType="fade">
           <View style={styles.modalOverlay}>
@@ -103,9 +125,19 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingHorizontal: responsive.padding.lg,
+    paddingTop: responsive.headerPaddingTop,
     paddingBottom: 20,
   },
   backButton: {
@@ -113,17 +145,17 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 30,
+    paddingHorizontal: responsive.padding.xl,
     paddingTop: 10,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
     marginBottom: 8,
@@ -132,7 +164,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 12,
     padding: 16,
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#000',
     minHeight: 140,
@@ -149,6 +181,15 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
   },
+  cancelLink: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelLinkText: {
+    fontSize: 16,
+    fontFamily: 'Poppins_600SemiBold',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
   warningBox: {
     backgroundColor: 'rgba(255, 152, 0, 0.2)',
     borderLeftWidth: 4,
@@ -158,7 +199,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   warningText: {
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: 'Poppins_400Regular',
     color: '#FFFFFF',
     lineHeight: 18,
@@ -178,13 +219,13 @@ const styles = StyleSheet.create({
     maxWidth: 340,
   },
   confirmTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
     marginBottom: 12,
   },
   confirmText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     textAlign: 'center',
@@ -202,7 +243,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#666',
   },
@@ -214,7 +255,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFFFFF',
   },

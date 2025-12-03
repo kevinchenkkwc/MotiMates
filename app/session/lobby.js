@@ -369,14 +369,14 @@ const styles = StyleSheet.create({
     maxWidth: responsive.maxWidth,
   },
   sessionName: {
-    fontSize: responsive.fontSize.xxl,
+    fontSize: responsive.fontSize.xxxl,
     fontFamily: 'Poppins_700Bold',
     color: '#000',
     marginBottom: responsive.padding.sm,
     textAlign: 'center',
   },
   inviteCode: {
-    fontSize: responsive.fontSize.md,
+    fontSize: responsive.fontSize.lg,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
     textAlign: 'center',
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
   },
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Poppins_700Bold',
     color: '#333',
     marginBottom: 12,
@@ -446,12 +446,12 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   participantName: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
     color: '#000',
   },
   hostBadge: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: 'Poppins_600SemiBold',
     color: '#8B1E1E',
     backgroundColor: '#FFE0E0',
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   readyText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_600SemiBold',
     color: '#4CAF50',
   },
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   holdingText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins_600SemiBold',
     color: '#4CAF50',
   },
@@ -511,10 +511,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   holdInstruction: {
-    fontSize: 14,
+    fontSize: 18,
     fontFamily: 'Poppins_400Regular',
     color: '#666',
-    marginBottom: 12,
+    marginBottom: 24,
     textAlign: 'center',
   },
   holdCounter: {
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     lineHeight: 52,
   },
   holdCounterLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     color: '#666',
     textTransform: 'uppercase',
